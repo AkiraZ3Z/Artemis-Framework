@@ -1,0 +1,10 @@
+name: "冒烟测试套件"
+description: "核心功能冒烟测试"
+testcases:
+  - "TC_USER_LOGIN_001"
+  - "TC_USER_REGISTER_001"
+tags: ["smoke", "critical"]
+priority_filter: "high"
+config:
+  base_url: "https://api.example.com"
+  environment: "test"

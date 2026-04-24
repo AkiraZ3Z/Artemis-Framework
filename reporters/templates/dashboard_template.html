@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ report.title }} - 仪表板</title>
+    <link rel="stylesheet" href="static/css/report.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="report-header">
+            <h1><i class="fas fa-tachometer-alt"></i> 测试执行仪表板</h1>
+            <p>Artemis Framework 测试执行概览</p>
+        </header>
+        
+        <!-- 添加仪表板特定内容 -->
+        <div class="dashboard-stats">
+            <!-- 可以在这里添加更多图表和统计信息 -->
+        </div>
+        
+        <footer class="report-footer">
+            <p>仪表板报告 | 生成时间: {{ report.timestamp }}</p>
+        </footer>
+    </div>
+</body>
+</html>

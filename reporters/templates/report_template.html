@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ report.title }} - Artemis 测试报告</title>
+    
+    <!-- 外部CSS文件 -->
+    <link rel="stylesheet" href="static/css/report.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js 图表库 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- 页面内联样式 -->
+    <style>
+        /* 基础样式 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6; 
+            color: #333; 
+            background: #f8f9fa; 
+        }
+        a { color: #3b82f6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        
+        /* 容器样式 */
+        .container { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        
+        /* 打印样式 */
+        @media print {
+            .no-print { display: none !important; }
+            .container { max-width: 100%; padding: 0; }
+            .testcase-details { display: block !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 报告头部 -->
+        <header class="report-header">
+            <div class="header-content">
+                <h1><i class="fas fa-chart-line"></i> {{ report.title }}</h1>
+                <p class="subtitle">Artemis Framework 自动化测试执行报告</p>
+                
+                <div class="header-meta">
+                    <div class="meta-item">
+                        <i class="fas fa-calendar"></i>
+                        <span>生成时间: {{ report.timestamp }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fas fa-bolt"></i>
+                        <span>环境: {{ report.environment|upper }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fas fa-user"></i>
+                        <span>执行人: {{ report.executor }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fas fa-code"></i>
+                        <span>Python: {{ report.python_version }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fas fa-fingerprint"></i>
+                        <span>会话ID: {{ report.session_id }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="header-stats">
+                <div class="stat-badge total">
+                    <span class="stat-label">总用例</span>
+                    <span class="stat-value">{{ summary.total }}</span>
+                </div>
+                <div class="stat-badge passed">
+                    <span class="stat-label">通过</span>
+                    <span class="stat-value">{{ summary.passed }}</span>
+                </div>
+                <div class="stat-badge failed">
+                    <span class="stat-label">失败</span>
+                    <span class="stat-value">{{ summary.failed }}</span>
+                </div>
+                <div class="stat-badge error">
+                    <span class="stat-label">错误</span>
+                    <span class="stat-value">{{ summary.error }}</span>
+                </div>
+                <div class="stat-badge skipped">
+                    <span class="stat-label">跳过</span>
+                    <span class="stat-value">{{ summary.skipped }}</span>
+                </div>
+            </div>
+        </header>
+        
+        <!-- 总体进度 -->
+        <section class="progress-section">
+            <h2><i class="fas fa-tachometer-alt"></i> 执行概览</h2>
+            <div class="progress-container">
+                <div class="progress-labels">
+                    <span>成功率: {{ "%.1f"|format(summary.success_rate) }}%</span>
+                    <span>总耗时: {{ summary.total_duration|format_duration }}</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-segment passed" style="width: {{ summary.passed_percent }}%"
+                        title="通过: {{ summary.passed_percent }}%"></div>
+                    <div class="progress-segment failed" style="width: {{ summary.failed_percent }}%"
+                        title="失败: {{ summary.failed_percent }}%"></div>
+                    <div class="progress-segment error" style="width: {{ summary.error_percent }}%"
+                        title="错误: {{ summary.error_percent }}%"></div>
+                    <div class="progress-segment skipped" style="width: {{ summary.skipped_percent }}%"
+                        title="跳过: {{ summary.skipped_percent }}%"></div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 图表区域 -->
+        <section class="charts-section">
+            <h2><i class="fas fa-chart-pie"></i> 数据可视化</h2>
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h3>用例分布</h3>
+                    <canvas id="testcaseChart" width="300" height="300"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>步骤统计</h3>
+                    <div class="step-stats">
+                        <div class="step-stat">
+                            <span class="step-label">总步骤</span>
+                            <span class="step-value">{{ summary.step_statistics.total }}</span>
+                        </div>
+                        <div class="step-stat">
+                            <span class="step-label">通过步骤</span>
+                            <span class="step-value">{{ summary.step_statistics.passed }}</span>
+                        </div>
+                        <div class="step-stat">
+                            <span class="step-label">失败步骤</span>
+                            <span class="step-value">{{ summary.step_statistics.failed }}</span>
+                        </div>
+                        <div class="step-stat">
+                            <span class="step-label">错误步骤</span>
+                            <span class="step-value">{{ summary.step_statistics.error }}</span>
+                        </div>
+                        <div class="step-stat">
+                            <span class="step-label">跳过步骤</span>
+                            <span class="step-value">{{ summary.step_statistics.skipped }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 筛选和搜索 -->
+        <section class="filters-section">
+            <h2><i class="fas fa-filter"></i> 测试用例列表</h2>
+            <div class="filters">
+                <div class="filter-group">
+                    <button class="filter-btn active" data-filter="all">全部 ({{ summary.total }})</button>
+                    <button class="filter-btn" data-filter="pass">通过 ({{ summary.passed }})</button>
+                    <button class="filter-btn" data-filter="fail">失败 ({{ summary.failed }})</button>
+                    <button class="filter-btn" data-filter="error">错误 ({{ summary.error }})</button>
+                    <button class="filter-btn" data-filter="skip">跳过 ({{ summary.skipped }})</button>
+                </div>
+                <div class="search-group">
+                    <input type="text" class="search-input" placeholder="搜索测试用例ID、名称或模块..." id="searchInput">
+                    <button class="search-btn" id="searchBtn"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+            
+            <!-- 导出按钮 -->
+            <div class="export-buttons no-print">
+                <button class="export-btn" onclick="exportReport('json')">
+                    <i class="fas fa-file-code"></i> 导出JSON
+                </button>
+                <button class="export-btn" onclick="exportReport('csv')">
+                    <i class="fas fa-file-csv"></i> 导出CSV
+                </button>
+                <button class="export-btn" onclick="window.print()">
+                    <i class="fas fa-print"></i> 打印报告
+                </button>
+            </div>
+        </section>
+        
+        <!-- 测试用例列表 -->
+        <section class="testcases-section">
+            {% for testcase in testcases %}
+            <article class="testcase-card" data-status="{{ testcase.status }}" 
+                    data-id="{{ testcase.id }}" data-module="{{ testcase.module }}"
+                    data-priority="{{ testcase.priority }}">
+                <div class="testcase-header" onclick="toggleTestcaseDetails('{{ testcase.id }}')">
+                    <div class="testcase-info">
+                        <div class="testcase-title-row">
+                            <h3 class="testcase-title">{{ testcase.name }}</h3>
+                            <span class="testcase-id">{{ testcase.id }}</span>
+                        </div>
+                        
+                        <div class="testcase-meta">
+                            <span class="meta-item">
+                                <i class="fas fa-folder"></i>
+                                模块: {{ testcase.module }}
+                            </span>
+                            <span class="meta-item">
+                                <i class="fas fa-flag"></i>
+                                优先级: {{ testcase.priority|upper }}
+                            </span>
+                            <span class="meta-item">
+                                <i class="fas fa-clock"></i>
+                                耗时: {{ testcase.duration|format_duration }}
+                            </span>
+                            {% if testcase.tags %}
+                            <span class="meta-item">
+                                <i class="fas fa-tags"></i>
+                                标签: {{ testcase.tags|join(', ') }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        
+                        {% if testcase.description %}
+                        <p class="testcase-description">{{ testcase.description }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="testcase-status">
+                        <span class="status-badge status-{{ testcase.status|status_color }}">
+                            <i class="fas {% if testcase.status == 'pass' %}fa-check-circle
+                                    {% elif testcase.status == 'fail' %}fa-times-circle
+                                    {% elif testcase.status == 'error' %}fa-exclamation-triangle
+                                    {% elif testcase.status == 'skip' %}fa-forward
+                                    {% else %}fa-question-circle{% endif %}"></i>
+                            {{ testcase.status|upper }}
+                        </span>
+                        
+                        <button class="toggle-details-btn" onclick="toggleTestcaseDetails('{{ testcase.id }}', event)">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 测试用例详情（默认折叠） -->
+                <div class="testcase-details" id="details-{{ testcase.id }}">
+                    {% if testcase.error_message %}
+                    <div class="error-section">
+                        <h4><i class="fas fa-exclamation-circle"></i> 错误信息</h4>
+                        <div class="error-content">{{ testcase.error_message }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- 步骤详情 -->
+                    {% if testcase.steps %}
+                    <div class="steps-section">
+                        <h4><i class="fas fa-list-ol"></i> 执行步骤 ({{ testcase.steps|length }})</h4>
+                        <div class="steps-list">
+                            {% for step in testcase.steps %}
+                            <div class="step-item" data-status="{{ step.status }}">
+                                <div class="step-header">
+                                    <div class="step-info">
+                                        <span class="step-index">#{{ loop.index }}</span>
+                                        <span class="step-name">{{ step.name }}</span>
+                                    </div>
+                                    <div class="step-status">
+                                        <span class="step-duration">{{ step.duration|format_duration }}</span>
+                                        <span class="step-status-badge status-{{ step.status|status_color }}">
+                                            {{ step.status|upper }}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                {% if step.error_message %}
+                                <div class="step-error">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                    {{ step.error_message }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- 时间信息 -->
+                    <div class="time-info">
+                        <div class="time-item">
+                            <i class="fas fa-play"></i>
+                            <span>开始时间: {{ testcase.start_time|format_datetime if testcase.start_time else 'N/A' }}</span>
+                        </div>
+                        <div class="time-item">
+                            <i class="fas fa-stop"></i>
+                            <span>结束时间: {{ testcase.end_time|format_datetime if testcase.end_time else 'N/A' }}</span>
+                        </div>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+            
+            {% if not testcases %}
+            <div class="empty-state">
+                <i class="fas fa-clipboard-list fa-3x"></i>
+                <h3>没有测试用例数据</h3>
+                <p>没有找到可显示的测试用例结果</p>
+            </div>
+            {% endif %}
+        </section>
+        
+        <!-- 页脚 -->
+        <footer class="report-footer">
+            <div class="footer-content">
+                <p>
+                    <i class="fas fa-code-branch"></i> 本报告由 {{ report.generated_by }} v{{ report.version }} 自动生成
+                </p>
+                <p>
+                    <i class="fas fa-chart-line"></i> 成功率: {{ "%.1f"|format(summary.success_rate) }}% |
+                    <i class="fas fa-steps"></i> 总步骤: {{ summary.step_statistics.total }} |
+                    <i class="fas fa-clock"></i> 总耗时: {{ summary.total_duration|format_duration }}
+                </p>
+                <p class="timestamp">
+                    生成时间: {{ report.timestamp }} | 会话ID: {{ report.session_id }}
+                </p>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- 外部JavaScript文件 -->
+    <script src="static/js/report.js"></script>
+    
+    <!-- 内联JavaScript -->
+    <script>
+        // 图表数据
+        const chartData = {
+            labels: ['通过', '失败', '错误', '跳过'],
+            datasets: [{
+                data: [
+                    {{ summary.passed }},
+                    {{ summary.failed }},
+                    {{ summary.error }},
+                    {{ summary.skipped }}
+                ],
+                backgroundColor: [
+                    '#10b981',  // 通过 - 绿色
+                    '#ef4444',  // 失败 - 红色
+                    '#f59e0b',  // 错误 - 黄色
+                    '#6b7280'   // 跳过 - 灰色
+                ],
+                borderWidth: 1
+            }]
+        };
+        
+        // 图表配置
+        const chartConfig = {
+            type: 'doughnut',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        
+        // 初始化图表
+        window.addEventListener('DOMContentLoaded', function() {
+            // 渲染图表
+            const ctx = document.getElementById('testcaseChart');
+            if (ctx) {
+                new Chart(ctx, chartConfig);
+            }
+            
+            // 自动展开失败的测试用例
+            document.querySelectorAll('.testcase-card[data-status="fail"], .testcase-card[data-status="error"]')
+                .forEach(card => {
+                    const testcaseId = card.getAttribute('data-id');
+                    toggleTestcaseDetails(testcaseId);
+                });
+            
+            // 初始化搜索功能
+            initSearch();
+            
+            // 初始化筛选功能
+            initFilters();
+        });
+        
+        // 切换测试用例详情显示
+        function toggleTestcaseDetails(testcaseId, event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            
+            const details = document.getElementById('details-' + testcaseId);
+            const toggleBtn = document.querySelector(`.toggle-details-btn[onclick*="${testcaseId}"] i`);
+            
+            if (details.classList.contains('expanded')) {
+                details.classList.remove('expanded');
+                if (toggleBtn) {
+                    toggleBtn.classList.remove('fa-chevron-up');
+                    toggleBtn.classList.add('fa-chevron-down');
+                }
+            } else {
+                details.classList.add('expanded');
+                if (toggleBtn) {
+                    toggleBtn.classList.remove('fa-chevron-down');
+                    toggleBtn.classList.add('fa-chevron-up');
+                }
+            }
+        }
+        
+        // 导出报告
+        function exportReport(format) {
+            const reportData = {
+                metadata: {
+                    title: "{{ report.title }}",
+                    timestamp: "{{ report.timestamp }}",
+                    sessionId: "{{ report.session_id }}"
+                },
+                summary: {
+                    total: {{ summary.total }},
+                    passed: {{ summary.passed }},
+                    failed: {{ summary.failed }},
+                    error: {{ summary.error }},
+                    skipped: {{ summary.skipped }},
+                    success_rate: {{ summary.success_rate }},
+                    total_duration: {{ summary.total_duration }}
+                }
+            };
+            
+            if (format === 'json') {
+                const dataStr = JSON.stringify(reportData, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+                downloadFile(dataUri, 'test_report_{{ report.session_id }}.json');
+            } else if (format === 'csv') {
+                // 简化版CSV导出
+                const csvContent = "ID,名称,状态,模块,优先级,耗时(秒)\n" +
+                    {% for testcase in testcases %}
+                    '"{{ testcase.id }}","{{ testcase.name }}","{{ testcase.status }}","{{ testcase.module }}","{{ testcase.priority }}",{{ testcase.duration }}'{% if not loop.last %}+"\n"{% endif %}{% endfor %};
+                const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+                downloadFile(dataUri, 'test_report_{{ report.session_id }}.csv');
+            }
+        }
+        
+        // 文件下载函数
+        function downloadFile(dataUri, filename) {
+            const link = document.createElement('a');
+            link.setAttribute('href', dataUri);
+            link.setAttribute('download', filename);
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // 全局函数导出
+        window.toggleTestcaseDetails = toggleTestcaseDetails;
+        window.exportReport = exportReport;
+    </script>
+</body>
+</html>

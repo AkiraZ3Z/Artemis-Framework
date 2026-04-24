@@ -1,0 +1,118 @@
+testcase:
+  id: "TC_SAMPLE_001"
+  name: "完整示例测试用例"
+  description: "展示测试用例执行器的完整功能"
+  module: "executor"
+  priority: "medium"
+  tags: ["smoke", "demo"]
+  author: "Akira"
+  version: "1.0.0"
+  status: "ready"
+  
+  config:
+    base_url: "https://jsonplaceholder.typicode.com"
+    timeout: 30
+    stop_on_failure: false
+    
+  setup:
+    - action: "variable.set"
+      params:
+        test_start_time: "${TIMESTAMP}"
+        test_run_id: "${UUID}"
+    
+  steps:
+    - name: "获取用户列表"
+      action: "api.call"
+      params:
+        method: "GET"
+        url: "${config.base_url}/users"
+      validate:
+        - expect: "${response.status_code}"
+          to_be: 200
+        - expect: "${response.body}"
+          to_be: list
+        - expect: "len(${response.body})"
+          greater_than: 0
+      save:
+        first_user: "${response[0]}"
+        first_user_id: "${response[0].id}"
+        first_user_name: "${response[0].name}"
+        
+    - name: "获取特定用户详情"
+      action: "api.call"
+      params:
+        method: "GET"
+        url: "${config.base_url}/users/{user_id}"
+        path_params:
+          user_id: "${first_user_id}"
+      validate:
+        - expect: "${response.status_code}"
+          to_be: 200
+        - expect: "${response.body.id}"
+          to_equal: "${first_user_id}"
+        - expect: "${response.body.name}"
+          to_equal: "${first_user_name}"
+      save:
+        user_email: "${response.body.email}"
+        
+    - name: "创建新帖子"
+      action: "api.call"
+      params:
+        method: "POST"
+        url: "${config.base_url}/posts"
+        data:
+          title: "测试帖子"
+          body: "这是一个测试帖子内容"
+          userId: "${first_user_id}"
+      validate:
+        - expect: "${response.status_code}"
+          to_be: 201
+        - expect: "${response.body.title}"
+          to_equal: "测试帖子"
+      save:
+        new_post_id: "${response.body.id}"
+        
+    - name: "更新帖子"
+      action: "api.call"
+      params:
+        method: "PUT"
+        url: "${config.base_url}/posts/{post_id}"
+        path_params:
+          post_id: "${new_post_id}"
+        data:
+          id: "${new_post_id}"
+          title: "更新后的标题"
+          body: "更新后的内容"
+          userId: "${first_user_id}"
+      validate:
+        - expect: "${response.status_code}"
+          to_be: 200
+        - expect: "${response.body.title}"
+          to_equal: "更新后的标题"
+          
+    - name: "删除帖子"
+      action: "api.call"
+      params:
+        method: "DELETE"
+        url: "${config.base_url}/posts/{post_id}"
+        path_params:
+          post_id: "${new_post_id}"
+      validate:
+        - expect: "${response.status_code}"
+          to_be: 200
+          
+    - name: "等待1秒"
+      action: "wait"
+      params:
+        seconds: 1
+        
+    - name: "验证变量"
+      action: "variable.set"
+      params:
+        verification_passed: true
+        test_end_time: "${TIMESTAMP}"
+        
+  teardown:
+    - action: "variable.set"
+      params:
+        cleanup_done: true

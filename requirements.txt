@@ -1,0 +1,18 @@
+# 核心依赖
+requests
+PyYAML
+pytest
+python-dotenv
+selenium
+
+# 测试报告
+pytest-html
+allure-pytest
+
+# 工具
+jinja2
+
+# 可选依赖
+# pytest-xdist
+# pytest-timeout
+# pytest-rerunfailures

@@ -1,0 +1,63 @@
+testcase:
+  id: "TC_USER_LOGIN_001"
+  name: "用户登录功能测试"
+  description: "测试用户登录的正向和反向场景"
+  module: "user"
+  priority: "high"
+  tags: ["smoke", "regression", "authentication"]
+  author: "Akira"
+  version: "1.0.0"
+  status: "ready"
+  
+  config:
+    base_url: "${ENV.BASE_URL}"
+    timeout: 10
+    retry_times: 2
+    
+  setup:
+    - action: "sql.execute"
+      file: "data/sql/clean_users.sql"
+    - action: "api.call"
+      service: "user.register"
+      data: 
+        username: "test_${RANDOM.string}"
+        password: "Test@123"
+        email: "${RANDOM.email}"
+      save_to: "registered_user"
+      
+  steps:
+    - name: "正常登录"
+      action: "api.call"
+      params:
+        method: "POST"
+        url: "${config.base_url}/api/v1/login"
+        data:
+          username: "${registered_user.username}"
+          password: "Test@123"
+      validate:
+        - expect: "${response.status_code}"
+          to_be: 200
+        - expect: "${response.body.token}"
+          not_to_be: null
+        - expect: "${response.body.user_id}"
+          to_equal: "${registered_user.id}"
+      save:
+        auth_token: "${response.body.token}"
+        
+    - name: "密码错误登录"
+      action: "api.call"
+      params:
+        method: "POST"
+        url: "${config.base_url}/api/v1/login"
+        data:
+          username: "${registered_user.username}"
+          password: "WrongPassword"
+      validate:
+        - expect: "${response.status_code}"
+          to_be: 401
+        - expect: "${response.body.message}"
+          to_contain: "密码错误"
+          
+  teardown:
+    - action: "sql.execute"
+      file: "data/sql/clean_test_data.sql"
