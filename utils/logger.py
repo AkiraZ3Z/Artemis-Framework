@@ -1,5 +1,5 @@
 """
-Artemis Framework 日志模块 - 增强版
+Artemis Framework 日志模块
 支持任务和用例级别的目录结构
 """
 
@@ -80,7 +80,7 @@ class DirectoryManager:
                             session_id: Optional[str] = None,
                             use_timestamp: bool = True) -> str:
         """
-        创建任务目录
+        创建日志与报告目录
         
         Args:
             base_dir: 基础目录
@@ -89,7 +89,7 @@ class DirectoryManager:
             use_timestamp: 是否在目录名中使用时间戳
         
         Returns:
-            任务目录路径
+            日志与报告目录路径
         """
         # 使用传入的 session_id 或全局 session_id
         if not session_id:
@@ -114,7 +114,7 @@ class DirectoryManager:
         os.makedirs(task_dir, exist_ok=True)
         
         # 创建子目录
-        subdirs = ["logs", "reports", "data", "temp"]
+        subdirs = ["testcases"]
         for subdir in subdirs:
             os.makedirs(os.path.join(task_dir, subdir), exist_ok=True)
         
@@ -125,10 +125,10 @@ class DirectoryManager:
                                 testcase_id: str,
                                 create_subdirs: bool = True) -> Dict[str, str]:
         """
-        创建测试用例目录
+        创建测试用例的报告与目录
         
         Args:
-            task_dir: 任务目录
+            task_dir: 测试用例的日志与报告目录
             testcase_id: 测试用例ID
             create_subdirs: 是否创建子目录
         
@@ -137,7 +137,7 @@ class DirectoryManager:
         """
         # 构建测试用例目录名称
         testcase_dir_name = f"{testcase_id}"
-        testcase_dir = os.path.join(task_dir, testcase_dir_name)
+        testcase_dir = os.path.join(f"{task_dir}\\testcases", testcase_dir_name)
         
         # 创建测试用例目录
         os.makedirs(testcase_dir, exist_ok=True)
@@ -165,13 +165,13 @@ class DirectoryManager:
     @staticmethod
     def get_latest_task_dir(base_dir: str = "reports") -> Optional[str]:
         """
-        获取最新的任务目录
+        获取最新的任务日志与报告目录
         
         Args:
             base_dir: 基础目录
         
         Returns:
-            最新的任务目录路径，如果不存在则返回None
+            最新的任务日志与报告目录路径，如果不存在则返回None
         """
         if not os.path.exists(base_dir):
             return None
@@ -245,14 +245,14 @@ class ArtemisLogger:
             max_file_size: int = 10 * 1024 * 1024,
             backup_count: int = 5,
             project_root: Optional[str] = None,
-            session_id: Optional[str] = None,  # 新增参数
+            session_id: Optional[str] = None,
             use_json: bool = False
     ):
         """
         初始化任务日志管理器
         
         Args:
-            task_dir: 任务目录
+            task_dir: 任务日志与报告目录
             task_name: 任务名称
             log_level: 日志级别
             use_json: 是否使用JSON格式
@@ -263,6 +263,7 @@ class ArtemisLogger:
         self.log_level = log_level
         self.use_json = use_json
         
+        # 确保只初始化一次
         if hasattr(self, '_initialized'):
             return
         self._initialized = True
@@ -285,7 +286,7 @@ class ArtemisLogger:
         
         # 记录任务开始
         self.logger.info(f"任务开始: {self.task_name}")
-        self.logger.info(f"报告目录: {self.task_dir}")
+        self.logger.info(f"报告与日志目录: {self.task_dir}")
         self.logger.info(f"会话ID: {self.session_id}")
     
     def _setup_handlers(self):
