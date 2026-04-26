@@ -1,0 +1,28 @@
+# .github/workflows/ci.yml
+name: Artemis CI
+
+on:
+  workflow_dispatch:  # 只允许手动触发
+
+jobs:
+  test:
+    # 添加这个条件，暂时禁用
+    if: false
+    
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Run tests
+        run: |
+          python -m pytest tests/
