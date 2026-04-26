@@ -114,7 +114,7 @@ class DirectoryManager:
         os.makedirs(task_dir, exist_ok=True)
         
         # 创建子目录
-        subdirs = ["testcases"]
+        subdirs = ["testcases", "tasklogs"]
         for subdir in subdirs:
             os.makedirs(os.path.join(task_dir, subdir), exist_ok=True)
         
@@ -308,7 +308,7 @@ class ArtemisLogger:
         self.logger.addHandler(console_handler)
         
         # 文件处理器 - 任务日志
-        task_log_path = os.path.join(self.task_dir, "logs", f"task_{self.session_id}.log")
+        task_log_path = os.path.join(self.task_dir, "tasklogs", f"task_{self.session_id}.log")
         file_handler = RotatingFileHandler(
             filename=task_log_path,
             maxBytes=10 * 1024 * 1024,  # 10MB
@@ -329,7 +329,7 @@ class ArtemisLogger:
         self.logger.addHandler(file_handler)
         
         # 错误日志处理器
-        error_log_path = os.path.join(self.task_dir, "logs", f"task_{self.session_id}.error.log")
+        error_log_path = os.path.join(self.task_dir, "tasklogs", f"task_{self.session_id}.error.log")
         error_handler = RotatingFileHandler(
             filename=error_log_path,
             maxBytes=10 * 1024 * 1024,

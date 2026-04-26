@@ -15,10 +15,8 @@ from dataclasses import dataclass, field, asdict
 from enum import Enum
 import copy
 
-current_script_path = os.path.abspath(__file__)
-current_dir = os.path.dirname(current_script_path)
-project_root = os.path.dirname(current_dir)
-sys.path.insert(0, project_root)
+# 添加项目根目录到sys.path，确保可以导入utils模块
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 导入日志模块
 from utils.logger import get_logger
