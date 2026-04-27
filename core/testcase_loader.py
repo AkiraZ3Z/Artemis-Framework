@@ -9,6 +9,7 @@ from xml.parsers.expat import errors
 import yaml
 import re
 import json
+import glob
 from typing import Dict, List, Any, Optional, Union, Set
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
@@ -574,10 +575,48 @@ class TestCaseLoader:
             logger.error(f"加载测试套件失败 {suite_file}: {e}")
             return None
     
-    def get_testcase(self, testcase_id: str) -> Optional[TestCase]:
-        """根据ID获取测试用例"""
-        return self.testcases.get(testcase_id)
-    
+    def get_testcase(self, testcase_id: str, auto_load: bool = True) -> Optional[TestCase]:
+        """
+        获取测试用例，支持自动加载
+        
+        Args:
+            testcase_id: 测试用例ID
+            auto_load: 如果缓存中不存在，是否自动从文件系统查找并加载
+        """
+        # 1. 先检查缓存
+        if testcase_id in self.testcases:
+            return self.testcases[testcase_id]
+        
+        # 2. 如果启用自动加载且缓存中没有
+        if auto_load:
+            # 在文件系统中查找对应的YAML文件
+            testcase_file = self._find_testcase_file(testcase_id)
+            if testcase_file:
+                return self.load_testcase(testcase_file)
+        
+        return None
+
+    def _find_testcase_file(self, testcase_id: str) -> Optional[str]:
+        """
+        根据测试用例ID查找对应的文件
+        
+        假设文件名格式为：{testcase_id}.yaml 或 test_{testcase_id}.yaml
+        或者可以从数据库/索引中查找
+        """
+        # 在基础目录中搜索
+        patterns = [
+            f"**/{testcase_id}.yaml",
+            f"**/{testcase_id}.yml",
+            f"**/test_{testcase_id}.yaml",
+            f"**/*{testcase_id}*.yaml"
+        ]
+        
+        for pattern in patterns:
+            for file_path in glob.glob(os.path.join(self.base_dir, pattern), recursive=True):
+                return file_path
+        
+        return None
+
     def get_testcases_by_filter(self, 
                             tags: Optional[List[str]] = None,
                             priority: Optional[str] = None,
@@ -729,6 +768,11 @@ def load_testcases_from_dir(dir_path: Optional[str] = None,
     loader = get_loader(base_dir)
     return loader.load_testcases_from_dir(dir_path, recursive)
 
+
+def load_test_suite(suite_file: str, base_dir: Optional[str] = None) -> Optional[TestSuite]:
+    """便捷函数：加载测试套件"""
+    loader = get_loader(base_dir)
+    return loader.load_test_suite(suite_file)
 
 # 测试代码
 if __name__ == "__main__":
