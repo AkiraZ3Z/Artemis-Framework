@@ -280,7 +280,7 @@ class APICallHandler(StepHandler):
         """解析动作，获取服务名和方法名"""
         # 格式: api.call 或 user.login
         parts = action.split('.')
-        if len(parts) == 2:
+        if len(parts) == 2:  # 目前不支持两段式结构，默认需要加上 api 前缀
             return parts[0], parts[1]
         elif len(parts) == 3 and parts[0] == 'api':
             return parts[1], parts[2]
