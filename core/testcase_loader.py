@@ -283,12 +283,30 @@ class VariableResolver:
         
         # 文件内容
         elif var_key.startswith("FILE."):
-            file_path = var_key[5:]  # 去掉"FILE."
+            file_path = var_key[5:]
+            
+            # 改进1：支持相对于测试用例文件的路径
+            if hasattr(self, 'current_testcase_path'):
+                base_dir = os.path.dirname(self.current_testcase_path)
+                file_path = os.path.join(base_dir, file_path)
+            
+            # 改进2：路径标准化
+            file_path = os.path.abspath(os.path.expanduser(file_path))
+            
+            # 改进3：安全检查
+            if not os.path.exists(file_path):
+                logger.error(f"文件不存在: {file_path}")
+                return f"${{{var_key}}}"
+            
+            if not os.path.isfile(file_path):
+                logger.error(f"路径不是文件: {file_path}")
+                return f"${{{var_key}}}"
+            
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     return f.read().strip()
-            except FileNotFoundError:
-                logger.warning(f"文件不存在: {file_path}")
+            except Exception as e:
+                logger.error(f"读取文件失败 {file_path}: {e}")
                 return f"${{{var_key}}}"
         
         # 随机值
