@@ -17,7 +17,7 @@ from enum import Enum
 import copy
 
 # 添加项目根目录到sys.path，确保可以导入utils模块
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # 导入日志模块
 from utils.logger import get_logger
