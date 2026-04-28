@@ -19,6 +19,8 @@ from dataclasses import dataclass, field, asdict
 from enum import Enum
 import copy
 
+from .json_path import resolve_path
+
 if TYPE_CHECKING:
     from .logger import TaskLogger, CaseLogger
 
@@ -197,10 +199,41 @@ class VariableResolver:
 
         result = value
         for match in matches:
-            var_key = match.strip()
-            var_value = self._get_variable_value(var_key, variables, file_context)
+            var_expr = match.strip()
+            # 先尝试作为整体变量名查找（兼容旧行为）
+            var_value = self._get_variable_value(var_expr, variables, file_context)
+            if var_value != f"${{{var_expr}}}":
+                # 找到了直接值
+                result = result.replace(f"${{{match}}}", str(var_value))
+                continue
+
+            # 否则，作为嵌套路径解析，尝试从 variables 的某个顶层变量开始
+            # 找到第一个点或方括号之前的根变量名
+            root_var = var_expr.split('.')[0].split('[')[0]
+            root_val = variables.get(root_var, None)
+            if root_val is not None:
+                # 使用 json_path 解析剩余路径
+                remaining_path = var_expr[len(root_var):]
+                if remaining_path.startswith('.'):
+                    remaining_path = remaining_path[1:]
+                elif remaining_path.startswith('['):
+                    pass  # 路径已经是正确格式
+                else:
+                    remaining_path = ""  # 没有剩余路径，直接取根值
+
+                if remaining_path:
+                    from .json_path import resolve_path
+                    resolved = resolve_path(root_val, remaining_path)
+                else:
+                    resolved = root_val
+            else:
+                # 如果根变量也不存在，则可能是一个全局函数调用，如 len(xxx)
+                # 这里暂时保留原样，后续可扩展函数支持
+                resolved = f"${{{match}}}"
+
+            # 替换占位符
             placeholder = f"${{{match}}}"
-            result = result.replace(placeholder, str(var_value))
+            result = result.replace(placeholder, str(resolved) if resolved is not None else '')
         return result
 
     def _get_variable_value(self, var_key: str, variables: Dict[str, Any], file_context: Optional[str] = None) -> str:

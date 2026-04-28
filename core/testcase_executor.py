@@ -353,12 +353,35 @@ class AssertionHandler(StepHandler):
 
     def _eval(self, expr: Any, context: ExecutionContext) -> Any:
         if isinstance(expr, str):
+            # 处理变量引用 ${...}
             if expr.startswith("${") and expr.endswith("}"):
-                return context.get_variable(expr[2:-1])
+                var_expr = expr[2:-1].strip()
+                # 先尝试直接作为变量从上下文获取（兼容旧）
+                if var_expr in context.variables:
+                    return context.variables[var_expr]
+                # 否则，尝试嵌套路径解析
+                # 分解根变量名
+                root_var = var_expr.split('.')[0].split('[')[0]
+                root_val = context.get_variable(root_var)
+                if root_val is not None:
+                    remaining = var_expr[len(root_var):]
+                    if remaining.startswith('.'):
+                        remaining = remaining[1:]
+                    elif not remaining:
+                        return root_val
+                    # 使用 json_path 解析
+                    from .json_path import resolve_path  # 延迟导入避免循环
+                    return resolve_path(root_val, remaining)
+                # 仍然作为简单变量返回默认 None
+                return None
+
+            # 处理 len() 函数表达式
             if expr.startswith("len(") and expr.endswith(")"):
                 inner = expr[4:-1]
                 val = self._eval(inner, context)
                 return len(val) if val else 0
+
+            return expr
         return expr
 
     def _compare(self, actual, expected, op: AssertionOperator):
