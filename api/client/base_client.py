@@ -22,9 +22,10 @@ from urllib3.util.retry import Retry
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 # 导入日志模块
-from utils.logger import get_logger
-
-logger = get_logger("base_client")
+from utils.logger import get_logger, get_task_logger, DirectoryManager
+task_dir = DirectoryManager.create_task_directory()
+os.makedirs(task_dir, exist_ok=True)
+logger = get_task_logger(task_dir, "base_client")
 
 
 class HttpMethod(Enum):
