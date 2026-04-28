@@ -1,7 +1,7 @@
 """
 Artemis Framework 测试用例执行器
 将加载的测试用例按步骤执行，结合 API 服务和变量上下文
-与 Artemis 日志系统完全集成，每个用例拥有独立 CaseLogger
+与 Artemis 日志系统完全集成，支持自动生成报告
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ import copy
 import json
 import re
 import traceback
-import inspect
 import logging
 from typing import Dict, List, Any, Optional, Tuple, Callable, Union, TYPE_CHECKING
 from dataclasses import dataclass, field, asdict
@@ -23,20 +22,20 @@ from enum import Enum
 # 相对导入框架核心模块
 from .logdir_manager import DirectoryManager
 from .testcase_loader import TestCase, TestStep, VariableResolver
-from .mail_fetch_handler import MailFetchHandler
 from .service_factory import ServiceFactory
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from config.config_loader import ConfigLoader   # 支持全局配置注入
 
 if TYPE_CHECKING:
     from .logger import TaskLogger, CaseLogger
+    from config.config_loader import ConfigLoader
 
-# 尝试导入报告管理器（若不存在则后续可补充）
+# 报告管理器
 try:
-    from reporters.report_manager import TaskReportManager
+    from reporters.report_manager import ReportManager
 except ImportError:
-    TaskReportManager = None
+    ReportManager = None
+
+# 步骤处理器
+from .mail_fetch_handler import MailFetchHandler
 
 
 class TestStatus(Enum):
@@ -171,7 +170,7 @@ class APICallHandler(StepHandler):
         try:
             params = self._resolve_params(step.params, context)
             service_name, method_name = self._parse_action(step.action)
-            service = self._get_service(service_name, context)
+            service = context.get_service(service_name)
             if not service:
                 return TestStatus.ERROR, None, {}, f"服务未找到: {service_name}"
             method = getattr(service, method_name, None)
@@ -223,13 +222,6 @@ class APICallHandler(StepHandler):
         elif len(parts) == 2:
             return parts[0], parts[1]
         return "unknown", "unknown"
-
-    def _get_service(self, service_name: str, context: ExecutionContext):
-        service = context.get_service(service_name)
-        if service:
-            return service
-        # 移除原有的全局 service_map 逻辑，保持上下文纯净
-        return None
 
     def _resolve_params(self, params: Dict, context: ExecutionContext) -> Dict:
         if not params:
@@ -347,20 +339,17 @@ class AssertionHandler(StepHandler):
             op = AssertionOperator(op_str)
         except ValueError:
             return False, f"无效操作符: {op_str}"
-
         passed, msg = self._compare(actual, expected, op)
         return passed, msg
 
     def _eval(self, expr: Any, context: ExecutionContext) -> Any:
         if isinstance(expr, str):
-            # 处理变量引用 ${...}
             if expr.startswith("${") and expr.endswith("}"):
                 var_expr = expr[2:-1].strip()
-                # 先尝试直接作为变量从上下文获取（兼容旧）
+                # 从上下文直接获取简单变量
                 if var_expr in context.variables:
                     return context.variables[var_expr]
-                # 否则，尝试嵌套路径解析
-                # 分解根变量名
+                # 尝试嵌套路径解析
                 root_var = var_expr.split('.')[0].split('[')[0]
                 root_val = context.get_variable(root_var)
                 if root_val is not None:
@@ -374,13 +363,11 @@ class AssertionHandler(StepHandler):
                     return resolve_path(root_val, remaining)
                 # 仍然作为简单变量返回默认 None
                 return None
-
             # 处理 len() 函数表达式
             if expr.startswith("len(") and expr.endswith(")"):
                 inner = expr[4:-1]
                 val = self._eval(inner, context)
                 return len(val) if val else 0
-
             return expr
         return expr
 
@@ -441,7 +428,7 @@ class WaitHandler(StepHandler):
 
 # ----------------- 测试执行器 -----------------
 class TestExecutor:
-    """测试用例执行器，绑定到一个任务日志器"""
+    """测试用例执行器，绑定到一个任务日志器，支持自动生成报告"""
 
     def __init__(self, task_logger: "TaskLogger", config: Optional[Dict] = None,
                  config_loader: Optional["ConfigLoader"] = None):
@@ -453,19 +440,25 @@ class TestExecutor:
         self.config = config or {}
         self.config_loader = config_loader
         self.handlers: List[StepHandler] = []
+
+        # 报告管理器
+        self.report_manager = None
+        if self.config.get("reporting", {}).get("enabled", True):
+            if ReportManager is not None:
+                try:
+                    self.report_manager = ReportManager(
+                        output_dir=task_logger.task_dir,
+                        config=self.config.get("reporting", {})
+                    )
+                    self.task_logger.info("报告管理器已初始化")
+                except Exception as e:
+                    self.task_logger.warning(f"初始化报告管理器失败: {e}")
+            else:
+                self.task_logger.warning("reporter 模块未安装，报告功能不可用")
+
         self._register_default_handlers()
         # 不再在这里准备一个全局 context，每个用例独立创建
         self.task_logger.info("测试执行器初始化完成")
-
-        # 可选：报告管理器
-        self.task_reporter = None
-        if TaskReportManager:
-            # 假设 TaskReportManager 接受 task_dir 等参数，可根据实际情况调整
-            self.task_reporter = TaskReportManager(
-                task_dir=task_logger.task_dir,
-                task_name=task_logger.task_name,
-                config=self.config.get("reporting", {})
-            )
 
     def _register_default_handlers(self):
         self.handlers = [
@@ -474,7 +467,7 @@ class TestExecutor:
             VariableSetHandler(),
             AssertionHandler(),
             WaitHandler(),
-            MailFetchHandler()  # 2026-04-28 新注册
+            MailFetchHandler(),  # 2026-04-28 新注册
         ]
 
     def register_handler(self, handler: StepHandler):
@@ -515,7 +508,7 @@ class TestExecutor:
         context.testcase = testcase
         context.test_result = test_result
         # 可将预先配置的服务注入上下文
-        self._inject_services(context)
+        self._inject_services(context, testcase, case_logger)
 
         try:
             # setup
@@ -526,7 +519,6 @@ class TestExecutor:
 
             # steps
             self._execute_steps(testcase, test_result, context, case_logger)
-
             # teardown (始终执行)
             self._execute_teardown(testcase, context, case_logger)
 
@@ -555,36 +547,33 @@ class TestExecutor:
             duration=test_result.duration,
             error_msg=test_result.error_message
         )
-
         # 输出摘要
         self._log_test_summary(test_result, case_logger)
         return test_result
 
-    def _inject_services(self, context: ExecutionContext, testcase: TestCase, case_logger: Optional["CaseLogger"] = None):
+    def _inject_services(self, context: ExecutionContext, testcase: TestCase,
+                         case_logger: Optional["CaseLogger"] = None):
         """根据用例配置和全局配置初始化并注入服务"""
         services_config = testcase.config.get('services', {})
         if not services_config:
             # 如果没有用例级的服务配置，可以尝试从全局配置的 services 段落获取默认服务？
             # 但为了避免混淆，我们可以让用户灵活选择：如果用例没定义，就不注入额外服务
-            return
 
+            return
         # 解析 services_config 中的变量（可能引用 config 或其他变量）
         # 这里我们使用 VariableResolver 先解析一下配置，确保 ${config.services.xxx.base_url} 能正确替换
-        from .testcase_loader import VariableResolver
         resolver = VariableResolver(context.variables)
         # 为了让变量能访问全局配置，我们把 config_loader 的配置放入上下文变量？
         # 简单做法：将 config_loader 的整个配置通过变量暴露
         if self.config_loader:
-            # 将全局配置展开到 context.variables 中的 config.xxx 下
-            flat_config = self.config_loader.config
-            context.set_variable('config', flat_config)  # 这样 YAML 中可用 ${config.logging.log_level}
+            # 将全局配置暴露为上下文变量 config
+            context.set_variable('config', self.config_loader.config)
         else:
             # 至少提供空配置避免解析报错
             context.set_variable('config', {})
 
         # 解析服务定义中的变量
         resolved_services = resolver.resolve(services_config, context=context.variables)
-
         # 调用 ServiceFactory 批量注册
         ServiceFactory.register_from_config(resolved_services, context, logger=case_logger)
 
@@ -722,10 +711,26 @@ class TestExecutor:
             logger.info(f"错误详情: {result.error_message}")
 
     def execute_testcases(self, testcases: List[TestCase]) -> List[TestResult]:
-        return [self.execute_testcase(tc) for tc in testcases]
+        results = [self.execute_testcase(tc) for tc in testcases]
+        # 生成报告
+        if self.report_manager:
+            try:
+                self.report_manager.add_results(results)
+                report_paths = self.report_manager.generate_reports(
+                    formats=self.config.get("reporting", {}).get("formats", ["html"]),
+                    session_id=self.task_logger.session_id,
+                    environment=self.config.get("environment", "test"),
+                    executor="Akira",
+                    python_version=sys.version.split()[0],
+                    title=f"Artemis Test Report - {self.task_logger.task_name}"
+                )
+                self.task_logger.info(f"报告已生成: {report_paths}")
+            except Exception as e:
+                self.task_logger.error(f"生成报告失败: {e}")
+        return results
 
 
-# 保留便捷函数，但改为显式传入 task_logger（推荐直接实例化）
+# 便捷函数
 def get_executor(task_logger: "TaskLogger", config: Optional[Dict] = None) -> TestExecutor:
     return TestExecutor(task_logger, config)
 
@@ -740,9 +745,8 @@ def execute_testcases(testcases: List[TestCase], task_logger: "TaskLogger", conf
     return executor.execute_testcases(testcases)
 
 
-# 测试代码
 if __name__ == "__main__":
-    
+    # 测试代码
     # 测试代码依赖相对导入，请使用: python -m core.testcase_executor
     from .testcase_loader import TestCaseLoader
     
