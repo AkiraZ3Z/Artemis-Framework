@@ -24,19 +24,13 @@ from enum import Enum
 from .logdir_manager import DirectoryManager
 from .testcase_loader import TestCase, TestStep, VariableResolver
 from .mail_fetch_handler import MailFetchHandler
+from .service_factory import ServiceFactory
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from config.config_loader import ConfigLoader   # 支持全局配置注入
 
 if TYPE_CHECKING:
     from .logger import TaskLogger, CaseLogger
-
-# 尝试导入 API 服务相关模块（若不存在则留空，不影响执行器结构）
-try:
-    from api.services import BaseService, ServiceResponse, get_user_service, get_order_service, get_product_service
-except ImportError:
-    BaseService = None
-    ServiceResponse = None
-    get_user_service = None
-    get_order_service = None
-    get_product_service = None
 
 # 尝试导入报告管理器（若不存在则后续可补充）
 try:
@@ -234,15 +228,7 @@ class APICallHandler(StepHandler):
         service = context.get_service(service_name)
         if service:
             return service
-        if BaseService is None:
-            return None
-        service_map = {
-            "user": get_user_service,
-            "order": get_order_service,
-            "product": get_product_service,
-        }
-        if service_name in service_map:
-            return service_map[service_name]()
+        # 移除原有的全局 service_map 逻辑，保持上下文纯净
         return None
 
     def _resolve_params(self, params: Dict, context: ExecutionContext) -> Dict:
@@ -434,15 +420,18 @@ class WaitHandler(StepHandler):
 class TestExecutor:
     """测试用例执行器，绑定到一个任务日志器"""
 
-    def __init__(self, task_logger: "TaskLogger", config: Optional[Dict] = None):
+    def __init__(self, task_logger: "TaskLogger", config: Optional[Dict] = None,
+                 config_loader: Optional["ConfigLoader"] = None):
         """
         :param task_logger: 任务日志器（已关联 task_dir）
         :param config: 可选配置字典
         """
         self.task_logger = task_logger
         self.config = config or {}
+        self.config_loader = config_loader
         self.handlers: List[StepHandler] = []
         self._register_default_handlers()
+        # 不再在这里准备一个全局 context，每个用例独立创建
         self.task_logger.info("测试执行器初始化完成")
 
         # 可选：报告管理器
@@ -548,12 +537,33 @@ class TestExecutor:
         self._log_test_summary(test_result, case_logger)
         return test_result
 
-    def _inject_services(self, context: ExecutionContext):
-        """将全局服务注入上下文，可按需扩展"""
-        # 示例：注入用户服务（如果可用）
-        if get_user_service:
-            context.set_service("user", get_user_service())
-        # 其他服务可根据配置添加
+    def _inject_services(self, context: ExecutionContext, testcase: TestCase, case_logger: Optional["CaseLogger"] = None):
+        """根据用例配置和全局配置初始化并注入服务"""
+        services_config = testcase.config.get('services', {})
+        if not services_config:
+            # 如果没有用例级的服务配置，可以尝试从全局配置的 services 段落获取默认服务？
+            # 但为了避免混淆，我们可以让用户灵活选择：如果用例没定义，就不注入额外服务
+            return
+
+        # 解析 services_config 中的变量（可能引用 config 或其他变量）
+        # 这里我们使用 VariableResolver 先解析一下配置，确保 ${config.services.xxx.base_url} 能正确替换
+        from .testcase_loader import VariableResolver
+        resolver = VariableResolver(context.variables)
+        # 为了让变量能访问全局配置，我们把 config_loader 的配置放入上下文变量？
+        # 简单做法：将 config_loader 的整个配置通过变量暴露
+        if self.config_loader:
+            # 将全局配置展开到 context.variables 中的 config.xxx 下
+            flat_config = self.config_loader.config
+            context.set_variable('config', flat_config)  # 这样 YAML 中可用 ${config.logging.log_level}
+        else:
+            # 至少提供空配置避免解析报错
+            context.set_variable('config', {})
+
+        # 解析服务定义中的变量
+        resolved_services = resolver.resolve(services_config, context=context.variables)
+
+        # 调用 ServiceFactory 批量注册
+        ServiceFactory.register_from_config(resolved_services, context, logger=case_logger)
 
     def _execute_setup(self, testcase, context, case_logger):
         for i, item in enumerate(testcase.setup):

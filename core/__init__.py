@@ -60,6 +60,7 @@ from .testcase_executor import (
 
 from .tools.mail_fetcher import MailFetcher
 from .mail_fetch_handler import MailFetchHandler
+from .service_factory import ServiceFactory
 
 __all__ = [
     # ID 生成器
@@ -103,5 +104,6 @@ __all__ = [
     "execute_testcase",
     "execute_testcases",
     "MailFetcher",
-    "MailFetchHandler"
+    "MailFetchHandler",
+    "ServiceFactory",
 ]

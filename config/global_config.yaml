@@ -1,290 +1,197 @@
 # ===================================================
-# Artemis Framework 全局配置文件
+# Artemis Framework 全局配置文件 (安全版)
 # ===================================================
-# 本文件定义了框架运行所需的所有配置。
-# 配置采用分层结构，支持通过环境变量覆盖。
+# 所有敏感信息（密码、token、密钥）都通过环境变量注入
+# 配置采用分层结构，支持通过环境变量覆盖
+# 环境变量前缀: ARTEMIS_ (例如 ARTEMIS_ENVIRONMENT=prod)
 
-# 项目基础信息
 project:
-  name: "Artemis Test Framework"  # 项目名称
-  version: "1.0.0"                # 框架版本
+  name: "Artemis Test Framework"
+  version: "1.0.0"
   description: "基于Python的现代化自动化测试框架"
   author: "Akira"
 
-# 环境配置
-# 可通过环境变量 ARTEMIS_ENV 指定当前环境，默认使用 'test'
-# 可选值: dev, test, staging, prod
+# 当前环境: dev, test, staging, prod（可通过 ARTEMIS_ENVIRONMENT 环境变量覆盖）
 environment: "test"
 
-# 日志配置
+# ------------------------------------------------
+# 日志系统配置（对齐 core.logger.LoggerConfig）
+# ------------------------------------------------
 logging:
-  # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
-  log_level: "INFO"
-  # 日志文件存储目录（相对于项目根目录）
-  log_dir: "reports/logs"
-  # 是否输出到控制台
+  log_level: "INFO"                # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_dir: "reports/logs"          # 日志目录
   log_to_console: true
-  # 是否输出到文件
   log_to_file: true
-  # 是否在日志文件名中使用时间戳（防止重复）
   use_timestamp: true
-  # 日志格式: 'text' 或 'json' (json格式便于ELK等系统收集)
-  format: "text"
-  # 单个日志文件最大大小（单位: MB）
-  max_file_size_mb: 10
-  # 保留的日志文件备份数量
-  backup_count: 7
-  # 控制台日志是否使用颜色
+  json_format: false               # 若为 true，日志输出为 JSON 格式
   console_color: true
+  # 文件轮转配置
+  task_max_bytes: 10485760          # 任务日志文件大小上限 (10 MB)
+  task_backup_count: 7
+  case_max_bytes: 5242880           # 用例日志文件大小上限 (5 MB)
+  case_backup_count: 3
 
-# API 客户端全局配置
-api:
-  # 全局默认超时时间（秒）
-  default_timeout: 30
-  # 全局默认重试次数
-  default_retry_times: 3
-  # SSL证书验证
-  verify_ssl: true
-  # 是否允许重定向
-  allow_redirects: true
-  
-  # 公共请求头（会添加到所有API请求中）
-  global_headers:
-    User-Agent: "Artemis-AutoTest-Framework/1.0.0"
-    Accept: "application/json"
-    Accept-Language: "zh-CN,zh;q=0.9,en;q=0.8"
-
-  # 代理配置（根据需要启用）
-  # proxies:
-  #   http: "http://user:pass@proxy.example.com:8080"
-  #   https: "http://user:pass@proxy.example.com:8080"
-
+# ------------------------------------------------
 # 测试数据配置
+# ------------------------------------------------
 test_data:
-  # 测试数据根目录
   data_dir: "data"
-  # 固定测试数据文件
   fixtures_dir: "data/fixtures"
-  # 动态生成的测试数据
   dynamic_dir: "data/dynamic"
-  # SQL脚本目录
   sql_dir: "data/sql"
-  
-  # 测试用户账号（示例，实际使用时建议从环境变量或加密文件读取）
+
+  # 测试账号（全部从环境变量读取，或使用变量生成）
   accounts:
     admin:
-      username: "admin_${RANDOM.string}"  # 支持变量
-      password: "Admin@123456"
+      username: "admin_${RANDOM.string}"
+      password: "${ENV.ADMIN_PASSWORD}"
       role: "administrator"
     normal_user:
       username: "user_${RANDOM.string}"
-      password: "User@123456"
+      password: "${ENV.USER_PASSWORD}"
       role: "user"
 
+# ------------------------------------------------
 # 测试执行配置
+# ------------------------------------------------
 test_execution:
-  # 默认测试用例目录
   testcase_dir: "testcases"
-  # 测试套件目录
   test_suite_dir: "testcases/suite"
-  
-  # 执行器配置
+
   executor:
-    # 步骤默认重试次数
     default_step_retry: 0
-    # 步骤重试间隔（秒）
     retry_interval: 1.0
-    # 步骤默认超时（秒）
     step_timeout: 30
-    # Setup失败时是否停止执行
     stop_on_setup_failure: true
-    # 步骤失败时是否停止执行
     stop_on_step_failure: false
-    # 是否在步骤失败时继续执行teardown
     always_run_teardown: true
-    
-  # 并发执行配置（预留功能）
-  parallel:
+
+  parallel:          # 预留
     enabled: false
     max_workers: 4
     worker_timeout: 300
 
-  # 测试过滤配置
   filter:
-    # 按标签过滤，只执行包含这些标签的用例
     include_tags: []
-    # 排除包含这些标签的用例
     exclude_tags: []
-    # 按优先级过滤：high, medium, low
     priority: []
-    # 按模块过滤
     modules: []
-    # 按测试用例ID过滤（支持通配符 TC_*）
     testcase_ids: []
 
+# ------------------------------------------------
 # 断言配置
+# ------------------------------------------------
 assertion:
-  # 浮点数比较时的容忍误差
   float_tolerance: 0.0001
-  # 列表比较时是否考虑顺序
   list_order_sensitive: true
-  # 对象比较时是否检查类型
   type_strict: false
-  # 断言失败时的详细日志级别
   fail_log_level: "ERROR"
 
+# ------------------------------------------------
 # 报告配置
+# ------------------------------------------------
 reporting:
-  # 报告输出目录
   output_dir: "reports"
-  
-  # HTML报告配置
+
   html:
     enabled: true
     output_dir: "reports/html"
     title: "Artemis 测试报告"
-    auto_open: false  # 测试完成后自动打开报告
+    auto_open: false
 
-    # Allure分类
-    categories:
-      - name: "产品缺陷"
-        matchedStatuses: ["failed"]
-        messageRegex: ".*AssertionError.*|.*expected.*but was.*|.*预期.*实际.*"
-        traceRegex: ".*"
-      - name: "测试缺陷"
-        matchedStatuses: ["broken"]
-        messageRegex: ".*TimeoutException.*|.*NoSuchElementException.*|.*ConnectionError.*"
-        traceRegex: ".*"
-      - name: "跳过"
-        matchedStatuses: ["skipped"]
-        messageRegex: ".*"
-      - name: "已知问题"
-        matchedStatuses: ["failed", "broken"]
-        messageRegex: ".*known issue.*|.*TODO.*|.*已知问题.*"
-        traceRegex: ".*"
-
-  # JUnit XML报告（用于Jenkins等CI集成）
   junit:
     enabled: true
     report_dir: "reports/xml"
     file_name: "junit-test-results.xml"
-    
-  # 测试执行完成后是否自动打开报告
+
   auto_open_report: false
 
-# 邮件通知配置
+# ------------------------------------------------
+# 邮件通知配置（所有敏感信息使用环境变量）
+# ------------------------------------------------
 notification:
   email:
     enabled: false
-    # SMTP服务器配置
-    smtp_server: "smtp.example.com"
-    smtp_port: 587
+    smtp_server: "${ENV.SMTP_SERVER}"
+    smtp_port: "${ENV.SMTP_PORT}"
     use_tls: true
-    username: "your-email@example.com"
-    password: "${EMAIL_PASSWORD}"  # 建议从环境变量读取
-    
-    # 发件人信息
-    from_addr: "artemis@example.com"
+    username: "${ENV.SMTP_USERNAME}"
+    password: "${ENV.SMTP_PASSWORD}"
+    from_addr: "${ENV.SMTP_FROM_ADDR}"
     from_name: "Artemis Test Framework"
-    
-    # 收件人列表
     to_addrs:
-      - "team@example.com"
-      - "manager@example.com"
-      
-    # 触发条件
-    on_success: false      # 测试全部通过时发送
-    on_failure: true       # 测试失败时发送
-    on_error: true         # 测试执行错误时发送
-    always: false          # 总是发送
-    
-    # 邮件内容
+      - "${ENV.NOTIFY_TO_ADDR}"
+    on_success: false
+    on_failure: true
+    on_error: true
+    always: false
     subject: "[Artemis测试报告] "
 
-# 各环境专用配置（覆盖上面的通用配置）
+# ------------------------------------------------
+# 多环境专用配置（覆盖上层配置）
+# ------------------------------------------------
 environments:
-  # 开发环境配置
   dev:
-    api:
-      default_timeout: 60  # 开发环境可以设置更长的超时
     logging:
-      log_level: "DEBUG"   # 开发环境开启DEBUG日志
-      
-    # 开发环境专用API端点
+      log_level: "DEBUG"
     services:
       user_service:
         base_url: "http://dev-api.example.com"
       order_service:
         base_url: "http://dev-api.example.com"
-        
-  # 测试环境配置  
+
   test:
-    api:
-      default_timeout: 30
     logging:
       log_level: "INFO"
-      
     services:
       user_service:
-        base_url: "https://test-api.example.com"
+        base_url: "${ENV.USER_SERVICE_URL}"       # 优先环境变量
       order_service:
-        base_url: "https://test-api.example.com"
-      
-    # 测试环境账号
+        base_url: "${ENV.ORDER_SERVICE_URL}"
+      product_service:
+        base_url: "${ENV.PRODUCT_SERVICE_URL}"
     test_data:
       accounts:
         admin:
-          username: "test_admin"
-          password: "${TEST_ADMIN_PWD}"  # 从环境变量读取
+          password: "${ENV.TEST_ADMIN_PASSWORD}"
 
-  # 预发布环境配置
   staging:
     api:
       verify_ssl: true
-      default_timeout: 15  # 预生产环境要求更快的响应
-      
+      default_timeout: 15
     services:
       user_service:
         base_url: "https://staging-api.example.com"
-        
     notification:
       email:
         enabled: true
-        recipients:
+        to_addrs:
           - "qa-team@example.com"
 
-  # 生产环境配置
   prod:
-    api:
-      verify_ssl: true
-      default_timeout: 10  # 生产环境超时设置较短
-      
     logging:
-      log_to_console: false  # 生产环境只输出到文件
-      log_level: "WARNING"   # 生产环境只记录警告及以上日志
-      
+      log_to_console: false
+      log_level: "WARNING"
     services:
       user_service:
-        base_url: "https://api.example.com"  # 正式地址
-        
+        base_url: "${ENV.PROD_USER_SERVICE_URL}"
     test_execution:
       filter:
-        include_tags: ["prod_safe"]  # 只执行标记为生产安全的用例
-        
+        include_tags: ["prod_safe"]
     notification:
       email:
         enabled: true
         on_failure: true
-        recipients:
+        to_addrs:
           - "prod-alert@example.com"
           - "sre-team@example.com"
 
-# 服务端点配置
-# 这里定义各个微服务的具体信息，会被 service 模块使用
+# ------------------------------------------------
+# 微服务端点定义
+# ------------------------------------------------
 services:
-  # 用户服务
   user_service:
-    base_url: "${USER_SERVICE_URL}"  # 优先从环境变量读取
+    base_url: "${ENV.USER_SERVICE_URL}"
     api_version: "v1"
     endpoints:
       login: "/auth/login"
@@ -294,115 +201,97 @@ services:
       list_users: "/users"
       update_user: "/users/{user_id}"
     timeout: 30
-    auth_type: "bearer"  # bearer, basic, oauth2, apikey
-    # 认证配置（根据auth_type填写）
+    auth_type: "bearer"
     auth_config:
-      token: "${AUTH_TOKEN}"  # bearer token
-      # username: "admin"     # basic auth
-      # password: "password"
-      # client_id: "xxx"      # oauth2
-      # client_secret: "xxx"
+      token: "${ENV.AUTH_TOKEN}"
 
-  # 订单服务
   order_service:
-    base_url: "${ORDER_SERVICE_URL}"
+    base_url: "${ENV.ORDER_SERVICE_URL}"
     api_version: "v1"
     endpoints:
       create_order: "/orders"
       get_order: "/orders/{order_id}"
       list_orders: "/orders"
       update_order: "/orders/{order_id}/status"
-    timeout: 60  # 订单服务可能需要更长时间
+    timeout: 60
 
-  # 商品服务
   product_service:
-    base_url: "${PRODUCT_SERVICE_URL}"
+    base_url: "${ENV.PRODUCT_SERVICE_URL}"
     api_version: "v1"
     endpoints:
       list_products: "/products"
       get_product: "/products/{product_id}"
       search_products: "/products/search"
 
-# 数据库配置（预留，如需数据库测试支持）
+# ------------------------------------------------
+# 数据库配置 (预留)
+# ------------------------------------------------
 database:
   enabled: false
-  # 主数据库
   primary:
-    dialect: "mysql"  # mysql, postgresql, sqlite
-    host: "localhost"
-    port: 3306
+    dialect: "mysql"
+    host: "${ENV.DB_HOST}"
+    port: "${ENV.DB_PORT}"
     database: "test_db"
-    username: "test_user"
-    password: "${DB_PASSWORD}"
+    username: "${ENV.DB_USERNAME}"
+    password: "${ENV.DB_PASSWORD}"
     pool_size: 5
-    echo_sql: false  # 是否打印SQL日志
-    
-  # 测试数据库（用于测试数据准备和清理）
+    echo_sql: false
   test:
     dialect: "sqlite"
-    database: ":memory:"  # 内存数据库，测试后自动清理
-    # 或使用文件数据库
-    # database: "data/test.db"
+    database: ":memory:"
 
-# 外部工具集成配置
+# ------------------------------------------------
+# 外部工具集成
+# ------------------------------------------------
 integrations:
-  # Docker配置（用于测试环境隔离）
   docker:
     enabled: false
-    # 测试用服务的Docker镜像
     services:
       mysql:
         image: "mysql:8.0"
-        ports:
-          - "3306:3306"
+        ports: ["3306:3306"]
         env:
           MYSQL_ROOT_PASSWORD: "root"
           MYSQL_DATABASE: "test_db"
       redis:
         image: "redis:7-alpine"
-        ports:
-          - "6379:6379"
-          
-  # CI/CD集成
+        ports: ["6379:6379"]
+
   ci:
-    # Jenkins配置
     jenkins:
-      job_url: "${JENKINS_JOB_URL}"
-      build_token: "${JENKINS_TOKEN}"
-      
-    # GitHub Actions配置
+      job_url: "${ENV.JENKINS_JOB_URL}"
+      build_token: "${ENV.JENKINS_TOKEN}"
     github_actions:
       workflow_file: ".github/workflows/ci.yml"
       trigger_on: ["push", "pull_request"]
 
-# 插件配置（预留扩展点）
+# ------------------------------------------------
+# 插件扩展点
+# ------------------------------------------------
 plugins:
-  # 自定义步骤处理器
   step_handlers:
     - module: "custom_handlers.payment_handler"
       class: "PaymentStepHandler"
     - module: "custom_handlers.websocket_handler"
       class: "WebSocketStepHandler"
-      
-  # 自定义报告生成器
   reporters:
     - module: "custom_reporters.slack_reporter"
       class: "SlackReporter"
       config:
-        webhook_url: "${SLACK_WEBHOOK_URL}"
+        webhook_url: "${ENV.SLACK_WEBHOOK_URL}"
         channel: "#test-automation"
 
-# 性能测试配置（预留）
+# ------------------------------------------------
+# 性能测试配置 (预留)
+# ------------------------------------------------
 performance:
   enabled: false
-  # 全局思考时间（秒）
   think_time: 1.0
-  # 并发用户配置
   users:
     min: 1
     max: 100
-    ramp_up: 10  # 每秒增加用户数
-  # 测试时长配置
+    ramp_up: 10
   duration:
-    unit: "seconds"  # seconds, minutes, hours
+    unit: "seconds"
     value: 300
