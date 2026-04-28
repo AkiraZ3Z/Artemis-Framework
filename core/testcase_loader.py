@@ -812,6 +812,8 @@ if __name__ == "__main__":
             print(f"   优先级: {testcase.priority}")
             print(f"   步骤数: {len(testcase.steps)}")
             print(f"   文件路径: {testcase.file_path}")
+            print(f"   邮箱地址: {testcase.config.get('email_address')}")
+            print(f"   授权码: {testcase.config.get('auth_code')}")
             
             # 显示第一个步骤
             if testcase.steps:
@@ -831,6 +833,10 @@ if __name__ == "__main__":
             module="example",
             priority="medium",
             tags=["smoke", "example"],
+            config={
+                "email_address":"your@emal.com",
+                "auth_code": "123456"
+            },
             steps=[
                 TestStep(
                     name="示例步骤",

@@ -13,6 +13,8 @@ testcase:
     base_url: "${ENV.BASE_URL}"
     timeout: 10
     retry_times: 2
+    email_address: "your@emal.com"
+    auth_code: "123456"
     
   setup:
     - action: "sql.execute"
