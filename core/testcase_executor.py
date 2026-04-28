@@ -34,9 +34,6 @@ try:
 except ImportError:
     ReportManager = None
 
-# 步骤处理器
-from .mail_fetch_handler import MailFetchHandler
-
 
 class TestStatus(Enum):
     """测试状态枚举"""
@@ -461,6 +458,8 @@ class TestExecutor:
         self.task_logger.info("测试执行器初始化完成")
 
     def _register_default_handlers(self):
+        # 延迟导入，避免循环依赖
+        from .mail_fetch_handler import MailFetchHandler
         self.handlers = [
             APICallHandler(),
             SQLExecuteHandler(),

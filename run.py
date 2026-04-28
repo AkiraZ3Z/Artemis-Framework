@@ -258,6 +258,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Artemis Framework 主运行入口",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False,
         epilog="""
 示例:
   # 运行默认目录下的所有用例
@@ -280,6 +281,8 @@ def create_argument_parser() -> argparse.ArgumentParser:
 """
     )
     # 基本参数
+    # 手动添加中文帮助
+    parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='显示帮助信息并退出')
     parser.add_argument("-c", "--config", help="配置文件路径 (默认: config/global_config.yaml)")
     parser.add_argument("--env", help="运行环境 (dev/test/staging/prod)，会覆盖配置文件")
     parser.add_argument("--task-name", help="任务名称，用于目录和报告标识")
