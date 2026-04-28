@@ -1,52 +1,107 @@
 """
-核心模块
-包含测试用例加载、执行、管理的核心功能
+Artemis Framework - 核心模块
+包含 ID 生成、日志与报告目录管理、日志系统、用例加载器、用例执行器
 """
 
-# 导入测试用例加载器相关类
-from core.testcase_loader import (
-    TestCase,
-    TestSuite,
-    TestStep,
-    TestCaseLoader,
-    VariableResolver,
-    get_loader
+from __future__ import annotations
+
+# ----- ID 生成器 -----
+from .id_generator import (
+    get_global_session_id,
+    set_global_session_id,
+    reset_global_session_id,
 )
 
-# 导入测试用例执行器相关类
-from core.testcase_executor import (
-    TestExecutor,
+# ----- 目录管理器 -----
+from .logdir_manager import DirectoryManager
+
+# ----- 日志系统 -----
+from .logger import (
+    LoggerConfig,
+    ColorFormatter,
+    JsonFormatter,
+    TaskLogger,
+    CaseLogger,
+)
+
+# ----- 用例加载器 -----
+from .testcase_loader import (
+    TestCaseStatus,
+    StepAction,
+    TestStep,
+    TestCase,
+    TestSuite,
+    VariableResolver,
+    TestCaseLoader,
+    get_loader,
+    load_testcase,
+    load_testcases_from_dir,
+    load_test_suite,
+)
+
+# ----- 用例执行器 -----
+from .testcase_executor import (
+    TestStatus,
+    AssertionOperator,
     StepResult,
     TestResult,
     ExecutionContext,
-    TestStatus,
-    AssertionOperator,
+    StepHandler,
+    APICallHandler,
+    SQLExecuteHandler,
+    VariableSetHandler,
+    AssertionHandler,
+    WaitHandler,
+    TestExecutor,
+    get_executor,
     execute_testcase,
     execute_testcases,
-    get_executor
 )
 
-# 导入其他可能需要的工具
-# 如果需要，可以在这里导入验证器、过滤器等
+from .tools.mail_fetcher import MailFetcher
+from .mail_fetch_handler import MailFetchHandler
 
-# 定义 __all__ 以明确导出的内容
 __all__ = [
-    # 测试用例相关
-    'TestCase',
-    'TestStep', 
-    'TestSuite',
-    'TestCaseLoader',
-    'VariableResolver',
-    'get_loader',
-    
-    # 测试执行相关
-    'TestExecutor',
-    'StepResult',
-    'TestResult',
-    'ExecutionContext',
-    'TestStatus',
-    'AssertionOperator',
-    'execute_testcase',
-    'execute_testcases',
-    'get_executor',
+    # ID 生成器
+    "get_global_session_id",
+    "set_global_session_id",
+    "reset_global_session_id",
+    # 目录管理器
+    "DirectoryManager",
+    # 日志系统
+    "LoggerConfig",
+    "ColorFormatter",
+    "JsonFormatter",
+    "TaskLogger",
+    "CaseLogger",
+    # 用例加载器
+    "TestCaseStatus",
+    "StepAction",
+    "TestStep",
+    "TestCase",
+    "TestSuite",
+    "VariableResolver",
+    "TestCaseLoader",
+    "get_loader",
+    "load_testcase",
+    "load_testcases_from_dir",
+    "load_test_suite",
+    # 用例执行器
+    "TestStatus",
+    "AssertionOperator",
+    "StepResult",
+    "TestResult",
+    "ExecutionContext",
+    "StepHandler",
+    "APICallHandler",
+    "SQLExecuteHandler",
+    "VariableSetHandler",
+    "AssertionHandler",
+    "WaitHandler",
+    "TestExecutor",
+    "get_executor",
+    "execute_testcase",
+    "execute_testcases",
+    "MailFetcher",
+    "MailFetchHandler"
 ]
