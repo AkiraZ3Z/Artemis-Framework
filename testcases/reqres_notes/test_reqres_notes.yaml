@@ -50,9 +50,8 @@ testcase:
       params:
         token: "${verification_code}"
       save:
-        # 假设返回的就是 token 字符串，可直接保存
-        session_token: ""
-    
+        session_token: "data.session_token"
+
     # ---------- 测试点2：查询所有笔记 ----------
     - name: "查询所有笔记"
       action: "api.notes.get_all_notes"

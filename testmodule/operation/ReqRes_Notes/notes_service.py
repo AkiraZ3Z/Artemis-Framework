@@ -39,14 +39,18 @@ class NotesService:
         headers = {"x-api-key": self.public_key}
         resp = self.client.post("/app-users/login", json_data=body, headers=headers)
         return {"status_code": resp.status_code, "data": resp.json()}
-
-    def get_verify_session(self, token: str) -> Optional[str]:
+    
+    def get_verify_session(self, token: str) -> Dict[str, Any]:
         """使用验证码获取 session_token"""
         body = {"token": token}
         resp = self.client.post("/app-users/verify", json_data=body)
         data = resp.json()
         self.session_token = data.get("data", {}).get("session_token")
-        return self.session_token
+        return {
+            "status_code": resp.status_code,
+            "data": data,
+            "session_token": self.session_token
+        }
 
     # ----------------- 笔记 CRUD -----------------
     def _auth_headers(self) -> Dict[str, str]:

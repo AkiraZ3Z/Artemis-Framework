@@ -189,7 +189,9 @@ class APICallHandler(StepHandler):
             duration_ms = (time.time() - start) * 1000
 
             saved_vars = {}
+            # ---- 新增：兼容字典返回值 ----
             if hasattr(response, 'is_success'):
+                # 原有 ServiceResponse 逻辑（保留）
                 if response.is_success:
                     response_data = response.data
                     if case_logger and hasattr(case_logger, 'api_response'):
@@ -205,8 +207,32 @@ class APICallHandler(StepHandler):
                             params.get('method', 'GET'), params.get('url', ''),
                             getattr(response, 'status_code', 500), duration_ms, response_data)
                     return TestStatus.FAIL, response_data, {}, response.message
+
+            elif isinstance(response, dict):
+                # 新增：字典返回处理
+                status_code = response.get('status_code', 200)
+                response_data = response.get('data', {})
+                message = response.get('message', '')
+                if 200 <= status_code < 300:
+                    # 成功
+                    if case_logger and hasattr(case_logger, 'api_response'):
+                        case_logger.api_response(
+                            params.get('method', 'GET'), params.get('url', ''),
+                            status_code, duration_ms, response_data)
+                    saved_vars = self._extract_saved_variables(step.save, response_data, context)
+                    return TestStatus.PASS, response_data, saved_vars, None
+                else:
+                    # 失败
+                    if case_logger and hasattr(case_logger, 'api_response'):
+                        case_logger.api_response(
+                            params.get('method', 'GET'), params.get('url', ''),
+                            status_code, duration_ms, response_data)
+                    return TestStatus.FAIL, response_data, {}, message or f"HTTP {status_code}"
+
             else:
+                # 其他未知类型
                 return TestStatus.ERROR, response, {}, "响应对象类型不匹配"
+
         except Exception as e:
             if case_logger:
                 case_logger.error(f"API调用异常: {e}")
