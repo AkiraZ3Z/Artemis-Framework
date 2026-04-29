@@ -74,7 +74,19 @@ class NotesService:
     def delete_note(self, note_id: str) -> Dict[str, Any]:
         headers = self._auth_headers()
         resp = self.client.delete(f"/app/collections/notes/records/{note_id}", headers=headers)
-        return {"status_code": resp.status_code, "message": "Note deleted successfully"}
+        if resp.status_code == 204:
+            return {"status_code": 204, "data": None, "message": "Note deleted successfully"}
+        # 提取错误详情（优先 JSON，其次文本）
+        error_detail = ""
+        try:
+            error_detail = resp.json()
+        except Exception:
+            error_detail = resp.text
+        return {
+            "status_code": resp.status_code,
+            "data": error_detail,
+            "message": f"Delete failed with status {resp.status_code}"
+        }
 
     def close(self):
         self.client.close()

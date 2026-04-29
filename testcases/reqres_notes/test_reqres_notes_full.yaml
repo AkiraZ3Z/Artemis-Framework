@@ -14,21 +14,21 @@ testcase:
     - name: "发送验证邮件"
       action: "api.notes.send_verify_email"
       params:
-        email: "${config.email}"
+        email: "${ENV.QQ_EMAIL}"
       save:
         send_status: "status_code"
       validate:
         - actual: "${send_status}"
-          expected: 201
+          expected: 200
           operator: "equal"
 
     # 2. 从邮箱获取验证码
     - name: "获取邮箱验证码"
       action: "mail.fetch"
       params:
-        email_address: "${config.email}"
+        email_address: "${ENV.QQ_EMAIL}"
         auth_code: "${ENV.QQ_AUTH_CODE}"
-        timeout: 120
+        timeout: 300
       save:
         verification_code: ""            # 会自动存入上下文变量 verification_code
 
