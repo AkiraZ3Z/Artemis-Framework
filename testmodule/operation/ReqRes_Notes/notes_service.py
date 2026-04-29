@@ -4,23 +4,26 @@ ReqRes Notes 业务服务
 可配合 Artemis 日志系统（注入 CaseLogger）或独立运行。
 """
 
+import email
 from typing import Optional, Dict, Any
 from testmodule.api_test.base_client import BaseHTTPClient
 
 
 class NotesService:
     def __init__(self, base_url: str = "https://reqres.in/api",
-                 public_key: str = "pub_388381eee8017cdfc2d23858a635eff985d0f79fd26d5882bffbb47b30d22c3d",
+                 public_key: Optional[str] = None,
+                 email: Optional[str] = None,
                  logger=None):
         """
         :param base_url: 基础 API 地址
         :param public_key: 公共 API Key
+        :param email: 默认邮箱地址
         :param logger: 日志器，将传递给 HTTP 客户端（如 CaseLogger）
         """
         self.base_url = base_url
         self.public_key = public_key
         self.client = BaseHTTPClient(base_url=base_url, logger=logger)
-        self.email: Optional[str] = None
+        self.email = email
         self.session_token: Optional[str] = None
 
     def set_email(self, email: str):
