@@ -1,0 +1,72 @@
+testcase:
+  id: "REQRES_NOTES_FULL"
+  name: "ReqRes Notes 完整流程（真实邮箱验证码）"
+  config:
+    services:
+      notes:
+        class: "testmodule.operation.ReqRes_Notes.notes_service.NotesService"
+        params:
+          base_url: "https://reqres.in"
+          public_key: "${ENV.REQRES_PUBLIC_KEY}"
+          email: "${ENV.QQ_EMAIL}"
+  steps:
+    # 1. 发送验证邮件
+    - name: "发送验证邮件"
+      action: "api.notes.send_verify_email"
+      params:
+        email: "${config.email}"
+      save:
+        send_status: "status_code"
+      validate:
+        - actual: "${send_status}"
+          expected: 201
+          operator: "equal"
+
+    # 2. 从邮箱获取验证码
+    - name: "获取邮箱验证码"
+      action: "mail.fetch"
+      params:
+        email_address: "${config.email}"
+        auth_code: "${ENV.QQ_AUTH_CODE}"
+        timeout: 120
+      save:
+        verification_code: ""            # 会自动存入上下文变量 verification_code
+
+    # 3. 用验证码换取 session token
+    - name: "兑换 session token"
+      action: "api.notes.get_verify_session"
+      params:
+        token: "${verification_code}"
+      save:
+        session_status: "status_code"
+        session_token: "data.session_token"
+      validate:
+        - actual: "${session_status}"
+          expected: 200
+          operator: "equal"
+
+    # 4. 创建新笔记
+    - name: "创建新笔记"
+      action: "api.notes.create_note"
+      params:
+        title: "Artemis 自动化测试笔记"
+        content: "验证码流程打通，笔记创建成功"
+      save:
+        create_status: "status_code"
+        note_id: "data.id"
+      validate:
+        - actual: "${create_status}"
+          expected: 201
+          operator: "equal"
+
+    # 5. 删除笔记
+    - name: "删除笔记"
+      action: "api.notes.delete_note"
+      params:
+        note_id: "${note_id}"
+      save:
+        delete_status: "status_code"
+      validate:
+        - actual: "${delete_status}"
+          expected: 204
+          operator: "equal"

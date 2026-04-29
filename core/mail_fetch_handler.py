@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Dict, Any, Optional, Tuple, TYPE_CHECKING
 
 from .testcase_executor import TestStatus, StepHandler, TestStep, ExecutionContext
+from .testcase_loader import VariableResolver
 
 if TYPE_CHECKING:
     from .logger import CaseLogger
@@ -20,13 +21,14 @@ class MailFetchHandler(StepHandler):
     def can_handle(self, action: str) -> bool:
         return action == "mail.fetch"
 
-    def execute(self, step: TestStep, context: ExecutionContext,
-                case_logger: Optional["CaseLogger"] = None) -> Tuple[TestStatus, Any, Dict[str, Any], Optional[str]]:
+    def execute(self, step, context, case_logger=None):
         try:
             # 解析参数（支持变量引用）
-            params = step.params
-            email_addr = params.get("email_address") or context.get_variable("email_address")
-            auth_code = params.get("auth_code") or context.get_variable("auth_code")
+            # 先解析参数中的变量
+            resolver = VariableResolver(context.variables)
+            params = resolver.resolve(step.params)
+            email_addr = params.get("email_address")
+            auth_code = params.get("auth_code")            
             timeout = params.get("timeout", 120)
             sender_filter = params.get("sender_filter", "ReqRes")
 

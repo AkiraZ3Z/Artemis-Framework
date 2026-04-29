@@ -1,0 +1,22 @@
+testcase:
+  id: "QUICK_TEST_EMAIL"
+  name: "快速测试邮件发送"
+  config:
+    services:
+      notes:
+        class: "testmodule.operation.ReqRes_Notes.notes_service.NotesService"
+        params:
+          base_url: "https://reqres.in"
+          public_key: "${ENV.REQRES_PUBLIC_KEY}"
+          email: "${ENV.QQ_EMAIL}"
+  steps:
+    - name: "发送验证邮件"
+      action: "api.notes.send_verify_email"
+      params:
+        email: "${config.email}"
+      save:
+        send_status: "status_code"
+      validate:
+        - actual: "${send_status}"
+          expected: 200
+          operator: "equal"

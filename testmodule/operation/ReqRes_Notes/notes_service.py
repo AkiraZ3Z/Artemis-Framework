@@ -10,7 +10,7 @@ from testmodule.api_test.base_client import BaseHTTPClient
 
 
 class NotesService:
-    def __init__(self, base_url: str = "https://reqres.in/api",
+    def __init__(self, base_url: str = "https://reqres.in",
                  public_key: Optional[str] = None,
                  email: Optional[str] = None,
                  logger=None):
@@ -25,6 +25,8 @@ class NotesService:
         self.client = BaseHTTPClient(base_url=base_url, logger=logger)
         self.email = email
         self.session_token: Optional[str] = None
+        if self.public_key:
+            self.client.update_headers({"x-api-key": self.public_key})
 
     def set_email(self, email: str):
         self.email = email
@@ -37,13 +39,13 @@ class NotesService:
             raise ValueError("邮箱地址不能为空")
         body = {"email": target_email}
         headers = {"x-api-key": self.public_key}
-        resp = self.client.post("/app-users/login", json_data=body, headers=headers)
+        resp = self.client.post("/api/app-users/login", json_data=body, headers=headers)
         return {"status_code": resp.status_code, "data": resp.json()}
     
     def get_verify_session(self, token: str) -> Dict[str, Any]:
         """使用验证码获取 session_token"""
         body = {"token": token}
-        resp = self.client.post("/app-users/verify", json_data=body)
+        resp = self.client.post("/api/app-users/verify", json_data=body)
         data = resp.json()
         self.session_token = data.get("data", {}).get("session_token")
         return {

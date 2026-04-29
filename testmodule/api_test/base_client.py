@@ -353,7 +353,7 @@ class BaseHTTPClient:
             merged_headers = self.default_headers.copy()
             if headers:
                 merged_headers.update(headers)
-            request_data = json_data if json_data is not None else data
+            # 注意：不再统一合并 json_data 到 request_data
             merged_params = params or {}
             merged_kwargs = {
                 "timeout": self.config.timeout,
@@ -363,9 +363,9 @@ class BaseHTTPClient:
             }
             merged_kwargs.update(kwargs)
 
-            # 执行 before_request 钩子，可能返回缓存响应
+            # 执行 before_request 钩子（传递原始 json_data 以便日志）
             cached = self._execute_hook("before_request", request_id, method, full_url,
-                                        merged_params, merged_headers, request_data)
+                                        merged_params, merged_headers, json_data if json_data is not None else data)
             if isinstance(cached, requests.Response):
                 metrics.complete(cached.status_code)
                 return cached
@@ -373,9 +373,15 @@ class BaseHTTPClient:
             # 执行请求拦截器
             req_args = {
                 "method": method, "url": full_url, "params": merged_params,
-                "data": request_data, "headers": merged_headers, "files": files,
+                "headers": merged_headers, "files": files,
                 **merged_kwargs
             }
+            # 关键修复：使用 json 参数
+            if json_data is not None:
+                req_args["json"] = json_data
+            else:
+                req_args["data"] = data
+
             req_args = self._execute_request_interceptors(request_id, **req_args)
 
             # 发起请求
@@ -394,7 +400,7 @@ class BaseHTTPClient:
             metrics.complete(error=str(e))
             self._execute_hook("on_error", request_id, e)
             raise
-
+        
     # ----------------- 便捷方法 -----------------
     def get(self, url: str, params: Optional[Dict] = None, **kwargs) -> requests.Response:
         return self.request("GET", url, params=params, **kwargs)

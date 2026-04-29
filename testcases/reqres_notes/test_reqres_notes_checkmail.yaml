@@ -1,0 +1,19 @@
+testcase:
+  id: "FETCH_CODE_ONLY"
+  name: "仅提取邮箱验证码"
+  config:
+    email: "${ENV.QQ_EMAIL}"
+    auth_code: "${ENV.QQ_AUTH_CODE}"
+  steps:
+    - name: "从邮箱提取验证码"
+      action: "mail.fetch"
+      params:
+        email_address: "${ENV.QQ_EMAIL}"   # 引用用例 config 中的邮箱变量
+        auth_code: "${ENV.QQ_AUTH_CODE}"   # 引用用例 config 中的授权码变量
+        timeout: 300                       # 5 分钟超时
+      save:
+        verification_code: ""
+      validate:
+        - actual: "len(${verification_code})"
+          expected: 8
+          operator: "equal"

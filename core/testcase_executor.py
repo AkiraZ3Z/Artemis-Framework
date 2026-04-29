@@ -189,9 +189,9 @@ class APICallHandler(StepHandler):
             duration_ms = (time.time() - start) * 1000
 
             saved_vars = {}
-            # ---- 新增：兼容字典返回值 ----
+            # ---------- 处理返回结果 ----------
             if hasattr(response, 'is_success'):
-                # 原有 ServiceResponse 逻辑（保留）
+                # 原有 ServiceResponse 逻辑
                 if response.is_success:
                     response_data = response.data
                     if case_logger and hasattr(case_logger, 'api_response'):
@@ -199,6 +199,7 @@ class APICallHandler(StepHandler):
                             params.get('method', 'GET'), params.get('url', ''),
                             getattr(response, 'status_code', 200), duration_ms, response_data)
                     saved_vars = self._extract_saved_variables(step.save, response_data, context)
+                    self._save_response_to_case_dir(step.name, response_data, case_logger)
                     return TestStatus.PASS, response_data, saved_vars, None
                 else:
                     response_data = response.data
@@ -209,25 +210,27 @@ class APICallHandler(StepHandler):
                     return TestStatus.FAIL, response_data, {}, response.message
 
             elif isinstance(response, dict):
-                # 新增：字典返回处理
-                status_code = response.get('status_code', 200)
-                response_data = response.get('data', {})
-                message = response.get('message', '')
+                # 将整个响应字典作为提取变量的根对象
+                full_response = response
+                status_code = full_response.get('status_code', 500)
+                data = full_response.get('data', {})
+                message = full_response.get('message', '')
+
                 if 200 <= status_code < 300:
-                    # 成功
                     if case_logger and hasattr(case_logger, 'api_response'):
                         case_logger.api_response(
                             params.get('method', 'GET'), params.get('url', ''),
-                            status_code, duration_ms, response_data)
-                    saved_vars = self._extract_saved_variables(step.save, response_data, context)
-                    return TestStatus.PASS, response_data, saved_vars, None
+                            status_code, duration_ms, data)
+                    # 从完整响应中提取变量，而非仅从 data
+                    saved_vars = self._extract_saved_variables(step.save, full_response, context)
+                    self._save_response_to_case_dir(step.name, data, case_logger)
+                    return TestStatus.PASS, data, saved_vars, None
                 else:
-                    # 失败
                     if case_logger and hasattr(case_logger, 'api_response'):
                         case_logger.api_response(
                             params.get('method', 'GET'), params.get('url', ''),
-                            status_code, duration_ms, response_data)
-                    return TestStatus.FAIL, response_data, {}, message or f"HTTP {status_code}"
+                            status_code, duration_ms, data)
+                    return TestStatus.FAIL, data, {}, message or f"HTTP {status_code}"
 
             else:
                 # 其他未知类型
@@ -238,6 +241,35 @@ class APICallHandler(StepHandler):
                 case_logger.error(f"API调用异常: {e}")
             return TestStatus.ERROR, None, {}, str(e)
 
+    def _save_response_to_case_dir(self, step_name: str, response_data: Any, case_logger):
+        """将API响应保存到用例的 data 子目录中"""
+        if not case_logger:
+            return
+        # 尝试多种方式获得用例目录
+        case_dir = getattr(case_logger, 'case_dir', None)
+        if not case_dir:
+            return
+        try:
+            import os, json, time
+            data_dir = os.path.join(case_dir, "data")
+            os.makedirs(data_dir, exist_ok=True)
+            # 文件名：步骤名 + 时间戳
+            safe_name = "".join(c if c.isalnum() or c in (' ', '_', '-') else '_' for c in step_name)
+            filename = f"{safe_name}_{int(time.time()*1000)}.json"
+            filepath = os.path.join(data_dir, filename)
+            # 将响应数据写入
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump({
+                    "exported_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "response": response_data if isinstance(response_data, (dict, list)) else str(response_data)
+                }, f, ensure_ascii=False, indent=2)
+            if hasattr(case_logger, 'info'):
+                case_logger.info(f"响应数据已保存: {filepath}")
+        except Exception as e:
+            if hasattr(case_logger, 'error'):
+                case_logger.error(f"保存响应数据失败: {e}")
+
+    # ---------- 以下方法保持不变 ----------
     def _parse_action(self, action: str) -> Tuple[str, str]:
         parts = action.split('.')
         if len(parts) == 3 and parts[0] == 'api':
