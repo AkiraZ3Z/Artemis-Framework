@@ -1,0 +1,96 @@
+testcase:
+  id: "REQRES_NOTES_001"
+  name: "ReqRes Notes 功能测试"
+  description: "验证发送邮件、登录、查询/创建/删除笔记全流程"
+  module: "ReqResNotes"
+  priority: "high"
+  tags: ["api", "smoke"]
+  
+  config:
+    # 自动注册 Notes 服务
+    services:
+      notes:
+        class: "testmodule.operation.ReqRes_Notes.notes_service.NotesService"
+        params:
+          base_url: "https://reqres.in/api"
+          public_key: "${ENV.REQRES_PUBLIC_KEY}"
+    # 邮箱配置（从环境变量读取）
+    email: "${ENV.QQ_EMAIL}"
+    auth_code: "${ENV.QQ_AUTH_CODE}"
+  
+  steps:
+    # ---------- 测试点1：发送验证邮件 ----------
+    - name: "发送验证邮件"
+      action: "api.notes.send_verify_email"
+      params:
+        email: "${config.email}"
+      save:
+        # 保存响应状态码用于断言
+        send_status: "status_code"
+      validate:
+        - actual: "${send_status}"
+          expected: 200
+          operator: "equal"
+    
+    # ---------- 获取邮箱验证码 ----------
+    - name: "获取邮箱验证码"
+      action: "mail.fetch"
+      params:
+        email_address: "${config.email}"
+        auth_code: "${config.auth_code}"
+        timeout: 120
+      save:
+        # 邮件处理器会自动返回验证码，保存到上下文
+        verification_code: ""
+    
+    # ---------- 使用验证码换取 session token ----------
+    - name: "兑换 session token"
+      action: "api.notes.get_verify_session"
+      params:
+        token: "${verification_code}"
+      save:
+        # 假设返回的就是 token 字符串，可直接保存
+        session_token: ""
+    
+    # ---------- 测试点2：查询所有笔记 ----------
+    - name: "查询所有笔记"
+      action: "api.notes.get_all_notes"
+      save:
+        notes_status: "status_code"
+        notes_data: "data"
+      validate:
+        - actual: "${notes_status}"
+          expected: 200
+          operator: "equal"
+        - actual: "len(${notes_data})"
+          expected: 0
+          operator: "greater_equal"
+    
+    # ---------- 测试点3：创建新笔记 ----------
+    - name: "创建新笔记"
+      action: "api.notes.create_note"
+      params:
+        title: "Artemis 自动测试笔记"
+        content: "由 Artemis 框架生成的测试笔记"
+      save:
+        create_status: "status_code"
+        note_id: "data.id"
+      validate:
+        - actual: "${create_status}"
+          expected: 201
+          operator: "equal"
+        - actual: "${note_id}"
+          expected: ""
+          operator: "not_equal"    # 笔记ID应不为空
+    
+    # ---------- 测试点4：删除笔记 ----------
+    - name: "删除笔记"
+      action: "api.notes.delete_note"
+      params:
+        note_id: "${note_id}"
+      save:
+        delete_status: "status_code"
+      validate:
+        - actual: "${delete_status}"
+          expected: 204
+          operator: "equal"

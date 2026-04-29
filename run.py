@@ -130,6 +130,13 @@ class ArtemisRunner:
 
         # 4.1 从单个文件加载
         for file_path in self.args.testcase or []:
+            # --- 新增：自动去掉多余的 testcases 前缀 ---
+            if not os.path.isabs(file_path):
+                # 如果传入路径以 base_dir 的目录名开头，则去掉它
+                base_dir_name = os.path.basename(loader.base_dir)
+                if file_path.startswith(base_dir_name + os.sep) or file_path.startswith(base_dir_name + '/'):
+                    file_path = file_path[len(base_dir_name) + 1:]
+            # -----------------------------------------
             tc = loader.load_testcase(file_path)
             if tc:
                 testcases.append(tc)
@@ -261,6 +268,9 @@ def create_argument_parser() -> argparse.ArgumentParser:
         add_help=False,
         epilog="""
 示例:
+  # 创建新用例（交互式引导）
+  python run.py --new
+
   # 运行默认目录下的所有用例
   python run.py
 
@@ -293,10 +303,14 @@ def create_argument_parser() -> argparse.ArgumentParser:
 
     # 测试来源
     src = parser.add_argument_group("测试用例来源")
-    src.add_argument("-t", "--testcase", action="append", default=[], help="指定测试用例文件（可多次）")
+    src.add_argument("-t", "--testcase", action="append", default=[],
+                    help="指定测试用例文件（可多次），路径相对于 testcases/ 目录")
     src.add_argument("-d", "--test-dir", action="append", default=[], help="指定测试用例目录（可多次）")
     src.add_argument("-s", "--suite", action="append", default=[], help="指定测试套件文件（可多次）")
     src.add_argument("-r", "--recursive", action="store_true", help="递归加载目录")
+
+    # 生成新用例
+    parser.add_argument("--new", action="store_true", help="交互式创建新的测试用例 YAML 文件")
 
     # 版本
     parser.add_argument("--version", action="store_true", help="显示版本信息")
@@ -316,6 +330,17 @@ def main():
     if args.version:
         show_version()
         sys.exit(0)
+
+    # ---------- 新增脚手架集成 ----------
+    if args.new:
+        try:
+            from build_testcase import main as build_main
+            build_main()
+        except ImportError as e:
+            print("❌ 无法导入 build_testcase 模块，请确认文件存在且依赖已安装 (pyyaml)")
+            sys.exit(1)
+        return
+    # ------------------------------------
 
     runner = ArtemisRunner(args)
     success = runner.run()

@@ -62,10 +62,10 @@ class NotesService:
         resp = self.client.post("/app/collections/notes/records", json_data=body, headers=headers)
         return {"status_code": resp.status_code, "data": resp.json()}
 
-    def delete_note(self, note_id: str) -> str:
+    def delete_note(self, note_id: str) -> Dict[str, Any]:
         headers = self._auth_headers()
-        self.client.delete(f"/app/collections/notes/records/{note_id}", headers=headers)
-        return "Note deleted successfully"
+        resp = self.client.delete(f"/app/collections/notes/records/{note_id}", headers=headers)
+        return {"status_code": resp.status_code, "message": "Note deleted successfully"}
 
     def close(self):
         self.client.close()
