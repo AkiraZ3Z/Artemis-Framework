@@ -159,6 +159,7 @@ class VariableResolver:
     def __init__(self, variables: Optional[Dict[str, Any]] = None):
         self.variables = variables or {}
         self._add_default_variables()
+        self._add_environment_variables()
 
     def _add_default_variables(self):
         import time
@@ -175,6 +176,11 @@ class VariableResolver:
         self.variables['RANDOM_STRING'] = ''.join(
             random.choices(string.ascii_letters + string.digits, k=8)
         )
+
+    def _add_environment_variables(self):
+        """将系统环境变量加入解析器，前缀 ENV. """
+        for key, value in os.environ.items():
+            self.variables[f"ENV.{key}"] = value
 
     def resolve(self, value: Any, context: Optional[Dict[str, Any]] = None,
                 file_context: Optional[str] = None) -> Any:
