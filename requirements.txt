@@ -1,18 +1,29 @@
-# 核心依赖
-requests
-PyYAML
-pytest
-python-dotenv
-selenium
+# ==================== 核心依赖 ====================
+requests>=2.28.0
+pyyaml>=6.0
+jinja2>=3.1.2
 
-# 测试报告
-pytest-html
-allure-pytest
+# ==================== 测试报告（HTML） ====================
+# 内置的 HTML 报告依赖 Jinja2，已包含在核心依赖中
 
-# 工具
-jinja2
+# ==================== 可选依赖 ====================
 
-# 可选依赖
+# Allure 报告生成（需要额外安装 allure 命令行工具）
+# allure-pytest  # 如需生成 Allure 原始数据（框架已有内置 Allure 支持）
+
+# 并发执行（未来特性）
 # pytest-xdist
-# pytest-timeout
-# pytest-rerunfailures
+
+# 文件数据驱动（如需要读取 Excel）
+# openpyxl
+
+# 数据库测试（如需要连接数据库）
+# sqlalchemy
+# psycopg2-binary  # PostgreSQL
+# mysql-connector-python  # MySQL
+
+# UI 自动化（对接 Selenium）
+# selenium
+
+# 环境变量管理（可选，目前通过 VariableResolver 支持）
+# python-dotenv
