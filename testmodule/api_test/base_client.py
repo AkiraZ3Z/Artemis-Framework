@@ -270,6 +270,8 @@ class BaseHTTPClient:
         self.response_interceptors: List[Callable] = []
 
         self._log_info(f"HTTP客户端初始化，base_url: {self.base_url or '无'}")
+        # 最后一次请求的 真实方法 和 完整 URL
+        self.last_request_info = None
 
     def _log_info(self, msg):
         # 通过钩子管理器内部的日志记录？简单用模块 logger
@@ -392,6 +394,11 @@ class BaseHTTPClient:
             response = self._execute_response_interceptors(request_id, response)
 
             metrics.complete(response.status_code)
+            # 记录真实请求信息
+            self.last_request_info = {
+                "method": method,
+                "url": full_url
+            }
             self._execute_hook("after_request", metrics, response)
 
             return response

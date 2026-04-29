@@ -174,30 +174,48 @@ class APICallHandler(StepHandler):
             if not callable(method):
                 return TestStatus.ERROR, None, {}, f"服务方法未找到: {service_name}.{method_name}"
 
-            # 记录 API 请求
+            # 调用业务方法
+            start = time.time()
+            response = method(**params)
+            duration_ms = (time.time() - start) * 1000
+
+            # ----- 获取真实的请求方法及URL -----
+            if hasattr(service, 'client'):
+                last_info = getattr(service.client, 'last_request_info', None)
+                if last_info:
+                    req_method = last_info.get('method', 'GET')
+                    req_url = last_info.get('url', '')
+                else:
+                    req_method = params.get('method', 'GET')
+                    req_url = params.get('url', '')
+            else:
+                req_method = params.get('method', 'GET')
+                req_url = params.get('url', '')
+            # -----------------------------------
+
+            # 记录 API 请求（使用真实信息）
             if case_logger and hasattr(case_logger, 'api_request'):
                 case_logger.api_request(
-                    params.get('method', 'GET'),
-                    params.get('url', ''),
+                    req_method,                     # 真实方法
+                    req_url,                        # 真实URL
                     params.get('params'),
                     params.get('data'),
                     params.get('headers')
                 )
 
-            start = time.time()
-            response = method(**params)
-            duration_ms = (time.time() - start) * 1000
-
+            # 处理响应（ServiceResponse / dict / 其他）
             saved_vars = {}
-            # ---------- 处理返回结果 ----------
             if hasattr(response, 'is_success'):
-                # 原有 ServiceResponse 逻辑
+                # ServiceResponse 分支...
                 if response.is_success:
                     response_data = response.data
                     if case_logger and hasattr(case_logger, 'api_response'):
                         case_logger.api_response(
-                            params.get('method', 'GET'), params.get('url', ''),
-                            getattr(response, 'status_code', 200), duration_ms, response_data)
+                            req_method,             # 使用真实方法
+                            req_url,                # 使用真实URL
+                            getattr(response, 'status_code', 200),
+                            duration_ms,
+                            response_data)
                     saved_vars = self._extract_saved_variables(step.save, response_data, context)
                     self._save_response_to_case_dir(step.name, response_data, case_logger)
                     return TestStatus.PASS, response_data, saved_vars, None
@@ -205,35 +223,31 @@ class APICallHandler(StepHandler):
                     response_data = response.data
                     if case_logger and hasattr(case_logger, 'api_response'):
                         case_logger.api_response(
-                            params.get('method', 'GET'), params.get('url', ''),
-                            getattr(response, 'status_code', 500), duration_ms, response_data)
+                            req_method,
+                            req_url,
+                            getattr(response, 'status_code', 500),
+                            duration_ms,
+                            response_data)
                     return TestStatus.FAIL, response_data, {}, response.message
 
             elif isinstance(response, dict):
-                # 将整个响应字典作为提取变量的根对象
-                full_response = response
-                status_code = full_response.get('status_code', 500)
-                data = full_response.get('data', {})
-                message = full_response.get('message', '')
-
+                status_code = response.get('status_code', 500)
+                data = response.get('data', {})
+                message = response.get('message', '')
                 if 200 <= status_code < 300:
                     if case_logger and hasattr(case_logger, 'api_response'):
-                        case_logger.api_response(
-                            params.get('method', 'GET'), params.get('url', ''),
-                            status_code, duration_ms, data)
-                    # 从完整响应中提取变量，而非仅从 data
-                    saved_vars = self._extract_saved_variables(step.save, full_response, context)
+                        case_logger.api_response(req_method, req_url,
+                                                 status_code, duration_ms, data)
+                    saved_vars = self._extract_saved_variables(step.save, response, context)  # 从完整响应提取
                     self._save_response_to_case_dir(step.name, data, case_logger)
                     return TestStatus.PASS, data, saved_vars, None
                 else:
                     if case_logger and hasattr(case_logger, 'api_response'):
-                        case_logger.api_response(
-                            params.get('method', 'GET'), params.get('url', ''),
-                            status_code, duration_ms, data)
+                        case_logger.api_response(req_method, req_url,
+                                                 status_code, duration_ms, data)
                     return TestStatus.FAIL, data, {}, message or f"HTTP {status_code}"
 
             else:
-                # 其他未知类型
                 return TestStatus.ERROR, response, {}, "响应对象类型不匹配"
 
         except Exception as e:
