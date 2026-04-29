@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import inspect
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -46,33 +47,36 @@ class ServiceFactory:
         params = dict(service_def.get('params', {}))
 
         # 动态导入类
-        try:
-            module_name, class_name = class_path.rsplit('.', 1)
-            module = importlib.import_module(module_name)
-            cls = getattr(module, class_name)
-        except (ImportError, AttributeError) as e:
-            raise ImportError(f"无法导入服务类 '{class_path}': {e}")
+        module_name, class_name = class_path.rsplit('.', 1)
+        module = __import__(module_name, fromlist=[class_name])
+        cls = getattr(module, class_name)
 
-        # 准备构造参数：如果服务类的 __init__ 接受 logger 参数，则传入
-        # 同时尝试传入 context 如果服务需要
-        # 为了通用性，我们检查 __init__ 的参数列表
-        init_args = {}
+        # 收集我们想传递的所有候选参数
+        candidate_args = {}
         if logger is not None:
-            init_args['logger'] = logger
+            candidate_args['logger'] = logger
         if context is not None:
-            init_args['context'] = context
+            candidate_args['context'] = context
+        candidate_args.update(params)          # 业务参数优先级最高
 
-        # 合并 params（params 优先级更高，可覆盖 logger/context）
-        init_args.update(params)
-
+        # 检查 __init__ 接受的参数，仅传递有效的
         try:
-            instance = cls(**init_args)
+            sig = inspect.signature(cls.__init__)
+            valid_args = {}
+            for name, param in sig.parameters.items():
+                if name == 'self':
+                    continue
+                if name in candidate_args:
+                    valid_args[name] = candidate_args[name]
+                elif param.default is not inspect.Parameter.empty:
+                    # 使用默认值，不传递
+                    pass
+                # 没有默认值的参数如果没提供则会报错，由调用方处理
+            instance = cls(**valid_args)
         except TypeError as e:
-            # 如果因为不支持的参数导致失败，回退到仅使用 params
-            _logger.warning(f"使用全参数创建 {class_name} 失败，尝试仅使用 params: {e}")
+            # 兜底：用纯业务参数尝试（不传 logger/context）
             instance = cls(**params)
 
-        _logger.info(f"服务实例创建成功: {class_name} (class={class_path})")
         return instance
 
     @staticmethod
